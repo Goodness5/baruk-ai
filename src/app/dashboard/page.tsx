@@ -1,6 +1,7 @@
 "use client"
 import { useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useAppStore } from '../store/useAppStore';
 
 const stats = [
   { label: 'Total Value Locked', value: '$2,340,000' },
@@ -19,13 +20,20 @@ const data = [
 ];
 
 export default function DashboardPage() {
+  const tokens = useAppStore(s => s.tokens);
+  const tokenPrices = useAppStore(s => s.tokenPrices);
+  const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
+  const tokenPricesError = useAppStore(s => s.tokenPricesError);
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-            <div className="text-sm text-purple-200 mb-1">{stat.label}</div>
-            <div className="text-2xl font-bold text-white">{stat.value}</div>
+        {tokens.map((token) => (
+          <div key={token.address} className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
+            <div className="text-sm text-purple-200 mb-1">{token.symbol} Price</div>
+            <div className="text-2xl font-bold text-white">
+              {tokenPricesLoading ? 'Loading...' : tokenPricesError ? <span className="text-red-400">{tokenPricesError}</span> : tokenPrices[token.address.toLowerCase()] ? `$${tokenPrices[token.address.toLowerCase()].toFixed(4)}` : 'No price'}
+            </div>
           </div>
         ))}
       </div>

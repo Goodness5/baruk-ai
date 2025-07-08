@@ -19,7 +19,16 @@
     "recharts": "^3.0.2",
     "viem": "^2.31.7",
     "walletconnect": "^1.7.8",
-    "zustand": "^5.0.6"
+    "zustand": "^5.0.6",
+    "@cosmjs/proto-signing": "0.33.1",
+    "@cosmjs/amino": "0.33.1",
+    "@cosmjs/stargate": "0.33.1",
+    "cosmjs-types": "0.9.0",
+    "@sei-js/core": "^1.0.0",
+    "ethers": "^6.8.1",
+    "@keplr-wallet/types": "^0.10.10",
+    "@walletconnect/client": "1.8.0",
+    "@walletconnect/web3-provider": "^1.8.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

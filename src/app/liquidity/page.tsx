@@ -6,67 +6,65 @@ import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import routerAbi from '../../abi/BarukRouter.json';
 import { custom, createWalletClient, getContract } from 'viem';
-
-const poolStats = {
-  tvl: '$1,200,000',
-  volume: '$320,000',
-  apy: '7.5%',
-  yourShare: '0.23%'
-};
-
-const chartData = [
-  { date: 'Apr 1', tvl: 1000000 },
-  { date: 'Apr 8', tvl: 1100000 },
-  { date: 'Apr 15', tvl: 1200000 },
-  { date: 'Apr 22', tvl: 1150000 },
-  { date: 'Apr 29', tvl: 1200000 },
-];
+import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
+import { useContractInteraction } from '../lib/contracts';
 
 const routerAddress = '0xe605be74ba68fc255dB0156ab63c31b50b336D6B';
+const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function LiquidityPage() {
-  const tokens = useAppStore(s => s.tokens);
   const balances = useAppStore(s => s.balances);
   const balancesLoading = useAppStore(s => s.balancesLoading);
   const balancesError = useAppStore(s => s.balancesError);
   const address = useAppStore(s => s.address);
-  const [tokenA, setTokenA] = useState(tokens[0].address);
-  const [tokenB, setTokenB] = useState(tokens[1].address);
+  const tokenPrices = useAppStore(s => s.tokenPrices);
+  const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
+  const tokenPricesError = useAppStore(s => s.tokenPricesError);
+  const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
+  const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
+  const protocolTokens = getProtocolTokens(protocolId);
+  const [tokenA, setTokenA] = useState(protocolTokens[0]?.address || '');
+  const [tokenB, setTokenB] = useState(protocolTokens[1]?.address || '');
   const [amountA, setAmountA] = useState('');
   const [amountB, setAmountB] = useState('');
   const [loading, setLoading] = useState(false);
+  const { executeContract, isConnected } = useContractInteraction();
 
   const balanceA = balances.find(b => b.token === tokenA)?.amount || '0';
   const balanceB = balances.find(b => b.token === tokenB)?.amount || '0';
+  const priceA = tokenPrices[tokenA.toLowerCase()];
+  const priceB = tokenPrices[tokenB.toLowerCase()];
+
+  const getUSDValue = (amount: string, price: number) => {
+    const amountNum = parseFloat(amount) || 0;
+    return (price * amountNum).toFixed(2);
+  };
+
+  const formatBalance = (amount: string) => {
+    const num = parseFloat(amount);
+    if (num === 0) return '0';
+    if (num < 0.0001) return '< 0.0001';
+    return num.toFixed(4);
+  };
 
   const handleAddLiquidity = async () => {
-    if (!address || !window.ethereum || !amountA || !amountB || loading) return;
+    if (!address || !amountA || !amountB || loading || !isConnected) return;
     setLoading(true);
     toast.loading('Submitting add liquidity...', { id: 'addliq' });
     try {
-      const walletClient = createWalletClient({
-        transport: custom(window.ethereum)
-      });
-      const contract = getContract({
-        address: routerAddress,
-        abi: routerAbi,
-        client: walletClient
-      });
-      // Example args: [tokenA, tokenB, amountA, amountB, minA, minB, deadline, recipient]
       const minA = 0n;
       const minB = 0n;
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-      const recipient = address;
-      const tx = await contract.write.addLiquidity([
-        tokenA,
-        tokenB,
-        BigInt(amountA),
-        BigInt(amountB),
-        minA,
-        minB,
-        deadline,
-        recipient
-      ], { account: address });
+      const recipient = address as `0x${string}`;
+      
+      await executeContract(
+        protocol.type,
+        'router',
+        'addLiquidity',
+        [tokenA, tokenB, BigInt(amountA), BigInt(amountB), minA, minB, deadline, recipient],
+        { account: recipient }
+      );
+      
       toast.success('Add liquidity submitted!', { id: 'addliq' });
     } catch (err: any) {
       toast.error('Add liquidity failed: ' + (err?.message || err), { id: 'addliq' });
@@ -75,19 +73,76 @@ export default function LiquidityPage() {
     }
   };
 
+  const chartData = [
+    { date: '2024-07-01', tvl: 10000 },
+    { date: '2024-07-02', tvl: 12000 },
+    { date: '2024-07-03', tvl: 15000 },
+    { date: '2024-07-04', tvl: 13000 },
+    { date: '2024-07-05', tvl: 17000 },
+  ];
+
   return (
     <div className="max-w-2xl mx-auto mt-10 p-8 rounded-2xl bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl space-y-8">
-      <h1 className="text-2xl font-bold text-white mb-4">Add Liquidity</h1>
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-white">Add Liquidity</h1>
+        <div className="ml-auto">
+          <select
+            className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
+            value={protocolId}
+            onChange={e => setProtocolId(e.target.value)}
+          >
+            {SEI_PROTOCOLS.filter(p => p.services.includes('liquidity')).map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Real-time Balance Display */}
+      <div className="bg-gradient-to-br from-purple-800/40 via-blue-800/40 to-green-800/40 rounded-lg p-4 border border-purple-700/30">
+        <div className="text-white font-semibold mb-3 flex items-center gap-2">
+          <span>💰</span>
+          Token Balances
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="text-center">
+            <div className="text-purple-300 text-sm">Token A</div>
+            <div className="text-white font-bold text-lg">
+              {formatBalance(balanceA)}
+            </div>
+            {priceA && (
+              <div className="text-green-400 text-sm">
+                ${getUSDValue(balanceA, priceA)}
+              </div>
+            )}
+            <div className="text-purple-400 text-xs mt-1">
+              {tokenPricesLoading ? 'Loading price...' : priceA ? `$${priceA.toFixed(4)}` : 'No price'}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-purple-300 text-sm">Token B</div>
+            <div className="text-white font-bold text-lg">
+              {formatBalance(balanceB)}
+            </div>
+            {priceB && (
+              <div className="text-green-400 text-sm">
+                ${getUSDValue(balanceB, priceB)}
+              </div>
+            )}
+            <div className="text-purple-400 text-xs mt-1">
+              {tokenPricesLoading ? 'Loading price...' : priceB ? `$${priceB.toFixed(4)}` : 'No price'}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-4">
         <div className="flex gap-2">
-          <TokenSelector tokens={tokens} value={tokenA} onChange={setTokenA} className="flex-1" />
+          <TokenSelector tokens={protocolTokens} value={tokenA} onChange={setTokenA} className="flex-1" />
           <span className="text-purple-300 font-bold">+</span>
-          <TokenSelector tokens={tokens} value={tokenB} onChange={setTokenB} className="flex-1 border-green-700" />
+          <TokenSelector tokens={protocolTokens} value={tokenB} onChange={setTokenB} className="flex-1 border-green-700" />
         </div>
-        <div className="flex gap-2 text-xs text-purple-200 mt-1 mb-1">
-          <span className="flex-1">Balance: {balancesLoading ? 'Loading...' : balancesError ? <span className="text-red-400">{balancesError}</span> : balanceA}</span>
-          <span className="flex-1">Balance: {balancesLoading ? 'Loading...' : balancesError ? <span className="text-red-400">{balancesError}</span> : balanceB}</span>
-        </div>
+        
         <div className="flex gap-2">
           <input
             className="flex-1 bg-[#2d193c] text-white rounded-lg px-4 py-2 border border-purple-700 focus:outline-none"
@@ -105,29 +160,11 @@ export default function LiquidityPage() {
         <button
           className="w-full py-3 mt-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
           onClick={handleAddLiquidity}
-          disabled={!address || !amountA || !amountB || loading}
+          disabled={!address || !amountA || !amountB || loading || !isConnected}
         >
           {loading && <span className="loader border-2 border-t-2 border-purple-400 rounded-full w-5 h-5 animate-spin"></span>}
           {loading ? 'Adding...' : 'Add Liquidity'}
         </button>
-      </div>
-      <div className="grid grid-cols-2 gap-6 mt-8">
-        <div className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-          <div className="text-sm text-purple-200 mb-1">TVL</div>
-          <div className="text-2xl font-bold text-white">{poolStats.tvl}</div>
-        </div>
-        <div className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-          <div className="text-sm text-purple-200 mb-1">Volume (24h)</div>
-          <div className="text-2xl font-bold text-white">{poolStats.volume}</div>
-        </div>
-        <div className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-          <div className="text-sm text-purple-200 mb-1">APY</div>
-          <div className="text-2xl font-bold text-white">{poolStats.apy}</div>
-        </div>
-        <div className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-          <div className="text-sm text-purple-200 mb-1">Your Share</div>
-          <div className="text-2xl font-bold text-white">{poolStats.yourShare}</div>
-        </div>
       </div>
       <div className="mt-8">
         <div className="text-purple-200 mb-2 font-semibold">Pool TVL Over Time</div>

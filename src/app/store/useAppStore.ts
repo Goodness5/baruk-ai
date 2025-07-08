@@ -32,9 +32,9 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   address: null,
   tokens: [
-    { symbol: 'ETH', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
-    { symbol: 'USDC', address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7' },
-    { symbol: 'DAI', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
+    { symbol: 'TOKEN0', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
+    { symbol: 'TOKEN1', address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7' },
+    { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
   ],
   balances: [],
   balancesLoading: false,
