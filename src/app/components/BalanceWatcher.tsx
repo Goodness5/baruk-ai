@@ -83,12 +83,12 @@ export default function BalanceWatcher() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-purple-900/50 via-blue-900/50 to-green-900/50 border-b border-purple-700/30 p-4">
+    <div className="holo-surface border-b p-4">
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-white font-semibold flex items-center gap-2">
             <span>💰</span>
-            Wallet Balances
+            Piggy-Pocket Coins
             <span className="text-xs text-purple-300">
               ({type?.includes('internal') ? 'Internal' : 'External'} Wallet)
             </span>
@@ -116,7 +116,7 @@ export default function BalanceWatcher() {
               return (
                 <div
                   key={balance.token}
-                  className="bg-gradient-to-br from-[#2d193c]/80 via-[#1e2e2e]/80 to-[#3a1c4a]/80 rounded-lg p-3 border border-purple-700/30"
+                  className="glass-card p-3"
                 >
                   <div className="text-white font-semibold text-sm">{symbol}</div>
                   <div className="text-purple-300 text-xs mt-1">

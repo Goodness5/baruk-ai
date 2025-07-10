@@ -82,9 +82,9 @@ export default function LiquidityPage() {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-8 rounded-2xl bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl space-y-8">
+    <div className="max-w-2xl mx-auto mt-10 p-8 glass-card rounded-2xl space-y-8">
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-white">Add Liquidity</h1>
+        <h1 className="text-2xl font-bold neon-glow">Fill Juice-Pool</h1>
         <div className="ml-auto">
           <select
             className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
@@ -102,11 +102,11 @@ export default function LiquidityPage() {
       <div className="bg-gradient-to-br from-purple-800/40 via-blue-800/40 to-green-800/40 rounded-lg p-4 border border-purple-700/30">
         <div className="text-white font-semibold mb-3 flex items-center gap-2">
           <span>💰</span>
-          Token Balances
+          Coin Balances
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token A</div>
+            <div className="text-purple-300 text-sm">Coin A</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(balanceA)}
             </div>
@@ -120,7 +120,7 @@ export default function LiquidityPage() {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token B</div>
+            <div className="text-purple-300 text-sm">Coin B</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(balanceB)}
             </div>
@@ -158,12 +158,12 @@ export default function LiquidityPage() {
           />
         </div>
         <button
-          className="w-full py-3 mt-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full py-3 mt-2 glass-card neon-glow text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
           onClick={handleAddLiquidity}
           disabled={!address || !amountA || !amountB || loading || !isConnected}
         >
           {loading && <span className="loader border-2 border-t-2 border-purple-400 rounded-full w-5 h-5 animate-spin"></span>}
-          {loading ? 'Adding...' : 'Add Liquidity'}
+          {loading ? 'Filling...' : 'Fill Juice-Pool'}
         </button>
       </div>
       <div className="mt-8">

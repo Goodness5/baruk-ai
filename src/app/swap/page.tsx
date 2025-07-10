@@ -72,10 +72,10 @@ export default function SwapPage() {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-8 rounded-2xl bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl space-y-8">
+    <div className="max-w-lg mx-auto mt-10 p-8 glass-card rounded-2xl space-y-8">
       <div className="flex items-center gap-3 mb-4">
         <ArrowsRightLeftIcon className="h-7 w-7 text-purple-400" />
-        <h1 className="text-2xl font-bold text-white">Swap</h1>
+        <h1 className="text-2xl font-bold neon-glow">Trade</h1>
         <div className="ml-auto">
           <select
             className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
@@ -107,7 +107,7 @@ export default function SwapPage() {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token In</div>
+            <div className="text-purple-300 text-sm">Coin In</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(tokenInBalance)}
             </div>
@@ -121,7 +121,7 @@ export default function SwapPage() {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token Out</div>
+            <div className="text-purple-300 text-sm">Coin Out</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(tokenOutBalance)}
             </div>
@@ -151,12 +151,12 @@ export default function SwapPage() {
           onChange={e => setAmount(e.target.value)}
         />
         <button
-          className="w-full py-3 mt-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full py-3 mt-2 glass-card neon-glow text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
           onClick={handleSwap}
           disabled={!address || !amount || loading || !isConnected}
         >
           {loading && <span className="loader border-2 border-t-2 border-purple-400 rounded-full w-5 h-5 animate-spin"></span>}
-          {loading ? 'Swapping...' : 'Swap'}
+          {loading ? 'Trading...' : 'Trade'}
         </button>
       </div>
       <style jsx>{`

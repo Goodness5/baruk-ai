@@ -68,7 +68,7 @@ export default function ConnectWallet() {
   };
 
   const getWalletDisplayName = () => {
-    if (!type) return 'Connect Wallet';
+    if (!type) return 'Open Piggy-Pocket';
     const typeMap = {
       'evm-external': 'MetaMask',
       'evm-internal': 'EVM (Internal)',
@@ -101,7 +101,7 @@ export default function ConnectWallet() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowAccountSelector(!showAccountSelector)}
-              className="px-4 py-2 bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white rounded-lg hover:opacity-90 transition flex items-center gap-2"
+              className="px-4 py-2 glass-card neon-glow text-white rounded-lg hover:opacity-90 transition flex items-center gap-2"
             >
               <span>{getWalletIcon()}</span>
               <span>{getWalletDisplayName()}</span>
@@ -116,8 +116,8 @@ export default function ConnectWallet() {
             </button>
             <button
               onClick={handleDisconnect}
-              className="px-2 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
-              title="Disconnect"
+              className="px-2 py-2 glass-card text-white hover:bg-red-700 transition"
+              title="Close"
             >
               ✕
             </button>
@@ -129,7 +129,7 @@ export default function ConnectWallet() {
           disabled={isConnecting}
           className="px-4 py-2 bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white rounded-lg hover:opacity-90 transition disabled:opacity-60"
         >
-          {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          {isConnecting ? 'Connecting...' : 'Open Piggy-Pocket'}
         </button>
       )}
 

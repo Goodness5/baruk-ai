@@ -1,11 +1,12 @@
 import { HomeIcon, ArrowsRightLeftIcon, BeakerIcon, BanknotesIcon, ClipboardDocumentListIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import React from 'react';
 import Link from 'next/link';
 
 const nav = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-  { name: 'Swap', href: '/swap', icon: ArrowsRightLeftIcon },
-  { name: 'Liquidity', href: '/liquidity', icon: BeakerIcon },
-  { name: 'Pools', href: '/pools', icon: BanknotesIcon },
+  { name: 'Trade', href: '/swap', icon: ArrowsRightLeftIcon },
+  { name: 'Juice-Pool', href: '/liquidity', icon: BeakerIcon },
+  { name: 'Treasure-Chests', href: '/pools', icon: BanknotesIcon },
   { name: 'Lending', href: '/lending', icon: ClipboardDocumentListIcon },
   { name: 'Limit Orders', href: '/limit-orders', icon: ClipboardDocumentListIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
