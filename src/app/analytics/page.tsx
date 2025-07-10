@@ -1,3 +1,5 @@
+"use client";
+
 import { motion } from 'framer-motion';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
