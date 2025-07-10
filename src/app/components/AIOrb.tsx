@@ -1,10 +1,56 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import { SparklesIcon, XMarkIcon, ArrowUpCircleIcon } from "@heroicons/react/24/solid";
+import { useAI } from "./AIContext";
+
+const quickActions = [
+  { label: "Go to Trade", action: "navigate", data: { page: "/swap" } },
+  { label: "Go to Grow", action: "navigate", data: { page: "/liquidity" } },
+  { label: "Go to Borrow", action: "navigate", data: { page: "/lending" } },
+  { label: "Go to Triggers", action: "navigate", data: { page: "/limit-orders" } },
+  { label: "Go to Insights", action: "navigate", data: { page: "/analytics" } },
+  { label: "Go to Pools", action: "navigate", data: { page: "/pools" } },
+];
 
 export default function AIOrb() {
   const [open, setOpen] = useState(false);
+  const { state, dispatch } = useAI();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => inputRef.current?.focus(), 200);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state.chat, open]);
+
+  const handleSend = () => {
+    if (!state.input.trim()) return;
+    dispatch({ type: "SEND_MESSAGE", message: { role: "user", content: state.input } });
+    // Simulate AI response (replace with real AI integration)
+    setTimeout(() => {
+      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: "I'm here to help! (AI integration coming soon)" } });
+    }, 600);
+  };
+
+  const handleInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleSend();
+  };
+
+  const handleQuickAction = (action: string, data?: any) => {
+    dispatch({ type: "TRIGGER_ACTION", action, data });
+    setOpen(false);
+    // For navigation, use window.location for now
+    if (action === "navigate" && data?.page) {
+      window.location.href = data.page;
+    }
+  };
+
   return (
     <>
       {/* Floating AI Orb Button */}
@@ -41,13 +87,42 @@ export default function AIOrb() {
                 <SparklesIcon className="w-8 h-8 neon-text" />
                 <div className="text-lg font-bold neon-text">AI Agent</div>
               </div>
-              <div className="text-white/80 text-sm mb-2">Hi! I’m your AI Agent. Ask me anything about DeFi, trading, or this app. I’ll keep it simple!</div>
-              <input
-                className="w-full p-3 rounded-lg bg-black/40 border border-neon-cyan text-white focus:outline-none focus:ring-2 focus:ring-neon-cyan"
-                placeholder="Type your question..."
-                disabled
-              />
-              <div className="text-xs text-neon-cyan/80 mt-2">(AI chat coming soon!)</div>
+              <div className="flex-1 min-h-[200px] max-h-72 overflow-y-auto bg-transparent rounded-lg p-2">
+                {state.chat.map((msg, i) => (
+                  <div key={i} className={`mb-2 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`px-4 py-2 rounded-xl text-sm max-w-[80%] ${msg.role === 'user' ? 'bg-neon-cyan/20 text-neon-cyan' : 'bg-black/40 neon-text'}`}>{msg.content}</div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <input
+                  ref={inputRef}
+                  className="flex-1 p-3 rounded-lg bg-black/40 border border-neon-cyan text-white focus:outline-none focus:ring-2 focus:ring-neon-cyan"
+                  placeholder="Type your question..."
+                  value={state.input}
+                  onChange={e => dispatch({ type: "SET_INPUT", input: e.target.value })}
+                  onKeyDown={handleInputKey}
+                />
+                <button
+                  className="p-2 rounded-lg bg-neon-cyan/80 hover:bg-neon-cyan neon-text flex items-center justify-center"
+                  onClick={handleSend}
+                  aria-label="Send"
+                >
+                  <ArrowUpCircleIcon className="w-7 h-7" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {quickActions.map((qa) => (
+                  <button
+                    key={qa.label}
+                    className="px-3 py-1 rounded-lg bg-black/30 border border-neon-cyan text-neon-cyan text-xs hover:bg-neon-cyan/10 transition"
+                    onClick={() => handleQuickAction(qa.action, qa.data)}
+                  >
+                    {qa.label}
+                  </button>
+                ))}
+              </div>
             </motion.div>
           </motion.div>
         )}
