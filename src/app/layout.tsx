@@ -3,6 +3,7 @@ import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import BalanceWatcher from './components/BalanceWatcher';
 import TokenPriceWatcher from './components/TokenPriceWatcher';
+import AIOrb from './components/AIOrb';
 import { Toaster } from 'react-hot-toast';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BalanceWatcher />
             <TokenPriceWatcher />
             <main className="flex-1 p-6">{children}</main>
+            <AIOrb />
           </div>
         </div>
       </body>
