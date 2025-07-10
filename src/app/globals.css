@@ -1,26 +1,58 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --neon-purple: #a855f7;
+  --neon-cyan: #22d3ee;
+  --neon-green: #22d37a;
+  --hud-glass: rgba(34, 211, 238, 0.08);
+  --hud-border: rgba(168, 85, 247, 0.5);
+  --hud-glow: 0 0 16px var(--neon-purple), 0 0 32px var(--neon-cyan);
+  --hud-radius: 24px;
+  --hud-blur: blur(12px);
+  --hud-shadow: 0 4px 32px 0 rgba(34, 211, 238, 0.12);
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #0a0a0a 0%, #1e2e2e 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Geist', Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.hud-glass {
+  background: var(--hud-glass);
+  border: 2px solid var(--hud-border);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-shadow);
+  backdrop-filter: var(--hud-blur);
+  animation: hudGlow 2.5s infinite alternate;
+}
+
+@keyframes hudGlow {
+  0% { box-shadow: 0 0 16px var(--neon-purple), 0 0 32px var(--neon-cyan); }
+  100% { box-shadow: 0 0 32px var(--neon-cyan), 0 0 64px var(--neon-purple); }
+}
+
+.neon-text {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px var(--neon-cyan), 0 0 16px var(--neon-purple);
+}
+
+.neon-border {
+  border: 2px solid var(--neon-purple);
+  box-shadow: 0 0 8px var(--neon-purple);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #1e2e2e;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--neon-purple);
+  border-radius: 8px;
 }

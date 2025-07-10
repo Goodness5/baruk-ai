@@ -1,9 +1,9 @@
-"use client"
+"use client";
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
-import lendingAbi from '../../abi/BarukLending.json';
-import { custom, createWalletClient, getContract } from 'viem';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol } from '../lib/seiProtocols';
 import { useContractInteraction } from '../lib/contracts';
 
@@ -15,14 +15,11 @@ const assets = [
   { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
 ];
 
-export default function LendingPage() {
+export default function BorrowPage() {
   const address = useAppStore(s => s.address);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
-  const tokenPricesError = useAppStore(s => s.tokenPricesError);
   const balances = useAppStore(s => s.balances);
-  const balancesLoading = useAppStore(s => s.balancesLoading);
-  const balancesError = useAppStore(s => s.balancesError);
   const [selected, setSelected] = useState(assets[0].symbol);
   const [supplyAmount, setSupplyAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
@@ -50,7 +47,7 @@ export default function LendingPage() {
   const handleSupply = async () => {
     if (!address || !supplyAmount || loading || !isConnected) return;
     setLoading(true);
-    toast.loading('Supplying asset...', { id: 'supply' });
+    toast.loading('Storing your magic...', { id: 'supply' });
     try {
       await executeContract(
         protocol.type,
@@ -59,9 +56,15 @@ export default function LendingPage() {
         [asset.address, BigInt(supplyAmount), address],
         { account: address }
       );
-      toast.success('Supply submitted!', { id: 'supply' });
-    } catch (err: any) {
-      toast.error('Supply failed: ' + (err?.message || err), { id: 'supply' });
+      toast.success('Magic stored! ✨', { id: 'supply' });
+    } catch (err: unknown) {
+      let msg = 'Failed to store magic';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error(msg, { id: 'supply' });
     } finally {
       setLoading(false);
     }
@@ -70,7 +73,7 @@ export default function LendingPage() {
   const handleBorrow = async () => {
     if (!address || !borrowAmount || loading || !isConnected) return;
     setLoading(true);
-    toast.loading('Borrowing asset...', { id: 'borrow' });
+    toast.loading('Borrowing magic...', { id: 'borrow' });
     try {
       await executeContract(
         protocol.type,
@@ -79,21 +82,38 @@ export default function LendingPage() {
         [asset.address, BigInt(borrowAmount), address],
         { account: address }
       );
-      toast.success('Borrow submitted!', { id: 'borrow' });
-    } catch (err: any) {
-      toast.error('Borrow failed: ' + (err?.message || err), { id: 'borrow' });
+      toast.success('Magic borrowed! 🪄', { id: 'borrow' });
+    } catch (err: unknown) {
+      let msg = 'Failed to borrow magic';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error(msg, { id: 'borrow' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-8 rounded-2xl bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl space-y-8">
+    <motion.div
+      className="max-w-2xl mx-auto mt-10 p-8 rounded-2xl hud-glass neon-border shadow-xl space-y-8"
+      initial={{ opacity: 0, y: 40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      {/* AI Agent Tip */}
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-white">Lending & Borrowing</h1>
+        <SparklesIcon className="h-7 w-7 neon-text animate-pulse" />
+        <div className="text-lg neon-text font-bold">AI Tip:</div>
+        <div className="text-white/80 text-sm">Supply tokens to your vault, or borrow more with a tap. I’ll keep your magic safe and simple!</div>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-2xl font-bold neon-text">Borrow</h1>
         <div className="ml-auto">
           <select
-            className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
+            className="bg-black/40 border border-neon-cyan text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
             value={protocolId}
             onChange={e => setProtocolId(e.target.value)}
           >
@@ -104,72 +124,71 @@ export default function LendingPage() {
         </div>
       </div>
       {/* Real-time Balance Display */}
-      <div className="bg-gradient-to-br from-purple-800/40 via-blue-800/40 to-green-800/40 rounded-lg p-4 border border-purple-700/30">
+      <div className="bg-black/40 rounded-lg p-4 border border-neon-cyan/20">
         <div className="text-white font-semibold mb-3 flex items-center gap-2">
           <span>💰</span>
-          {selected} Balance
+          My Magic Vault ({selected})
         </div>
         <div className="text-center">
-          <div className="text-purple-300 text-sm">Available to Supply</div>
+          <div className="text-neon-cyan text-sm">Available to Store</div>
           <div className="text-white font-bold text-2xl">
             {formatBalance(balance)}
           </div>
           {price && (
-            <div className="text-green-400 text-lg">
+            <div className="text-neon-green text-lg">
               ${getUSDValue(balance, price)}
             </div>
           )}
-          <div className="text-purple-400 text-xs mt-1">
-            {tokenPricesLoading ? 'Loading price...' : price ? `$${price.toFixed(4)}` : 'No price'}
+          <div className="text-neon-cyan text-xs mt-1">
+            {tokenPricesLoading ? 'Loading...' : price ? `$${price.toFixed(4)}` : 'No price'}
           </div>
         </div>
       </div>
-
       <div className="flex gap-4 mb-6">
         {assets.map(a => (
-          <button key={a.symbol} onClick={() => setSelected(a.symbol)} className={`px-4 py-2 rounded-lg font-bold ${selected === a.symbol ? 'bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white' : 'bg-[#2d193c] text-purple-200'}`}>{a.symbol}</button>
+          <button key={a.symbol} onClick={() => setSelected(a.symbol)} className={`px-4 py-2 rounded-lg font-bold ${selected === a.symbol ? 'bg-gradient-to-r from-neon-cyan via-neon-green to-neon-purple neon-text' : 'bg-black/40 text-neon-cyan/60'}`}>{a.symbol}</button>
         ))}
       </div>
       <div className="flex gap-4 mt-6">
         <input
-          className="flex-1 bg-[#2d193c] text-white rounded-lg px-4 py-2 border border-purple-700 focus:outline-none"
-          placeholder="Supply Amount"
+          className="flex-1 bg-black/40 text-white rounded-lg px-4 py-2 border border-neon-cyan focus:outline-none"
+          placeholder="Store Amount"
           value={supplyAmount}
           onChange={e => setSupplyAmount(e.target.value)}
         />
         <button
-          className="px-6 py-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          className="px-6 py-2 rounded-lg bg-gradient-to-r from-neon-cyan via-neon-green to-neon-purple neon-text font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
           onClick={handleSupply}
           disabled={!address || !supplyAmount || loading || !isConnected}
         >
-          {loading && <span className="loader border-2 border-t-2 border-purple-400 rounded-full w-5 h-5 animate-spin"></span>}
-          {loading ? 'Supplying...' : 'Supply'}
+          {loading && <span className="loader border-2 border-t-2 border-neon-cyan rounded-full w-5 h-5 animate-spin"></span>}
+          {loading ? 'Storing...' : 'Store'}
         </button>
       </div>
       <div className="flex gap-4 mt-2">
         <input
-          className="flex-1 bg-[#2d193c] text-white rounded-lg px-4 py-2 border border-green-700 focus:outline-none"
+          className="flex-1 bg-black/40 text-white rounded-lg px-4 py-2 border border-neon-green focus:outline-none"
           placeholder="Borrow Amount"
           value={borrowAmount}
           onChange={e => setBorrowAmount(e.target.value)}
         />
         <button
-          className="px-6 py-2 rounded-lg bg-gradient-to-r from-green-500 via-purple-600 to-purple-700 text-white font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          className="px-6 py-2 rounded-lg bg-gradient-to-r from-neon-green via-neon-cyan to-neon-purple neon-text font-bold shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
           onClick={handleBorrow}
           disabled={!address || !borrowAmount || loading || !isConnected}
         >
-          {loading && <span className="loader border-2 border-t-2 border-green-400 rounded-full w-5 h-5 animate-spin"></span>}
+          {loading && <span className="loader border-2 border-t-2 border-neon-green rounded-full w-5 h-5 animate-spin"></span>}
           {loading ? 'Borrowing...' : 'Borrow'}
         </button>
       </div>
       <div className="mt-8">
-        <div className="text-purple-200 mb-2 font-semibold">Your Positions</div>
-        <div className="rounded-xl p-5 bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 shadow-lg">
-          <div className="flex justify-between text-purple-200 mb-1">
-            <span>Supplied</span>
+        <div className="neon-text mb-2 font-semibold">Your Magic Positions</div>
+        <div className="rounded-xl p-5 hud-glass neon-border">
+          <div className="flex justify-between neon-text mb-1">
+            <span>Stored</span>
             <span className="text-white font-bold">{supplyAmount} {selected}</span>
           </div>
-          <div className="flex justify-between text-purple-200">
+          <div className="flex justify-between neon-text">
             <span>Borrowed</span>
             <span className="text-white font-bold">{borrowAmount} {selected}</span>
           </div>
@@ -177,12 +196,12 @@ export default function LendingPage() {
       </div>
       <style jsx>{`
         .loader {
-          border-top-color: #a855f7;
-          border-right-color: #22d3ee;
-          border-bottom-color: #a855f7;
+          border-top-color: #22d3ee;
+          border-right-color: #a855f7;
+          border-bottom-color: #22d37a;
           border-left-color: transparent;
         }
       `}</style>
-    </div>
+    </motion.div>
   );
 } 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ethers, Wallet as EthersWallet } from 'ethers';
-import { DirectSecp256k1HdWallet, OfflineSigner, Registry, encodePubkey } from '@cosmjs/proto-signing';
+import { ethers } from 'ethers';
+import { DirectSecp256k1HdWallet, OfflineSigner } from '@cosmjs/proto-signing';
 import { SigningStargateClient } from '@cosmjs/stargate';
 import { Window as KeplrWindow } from '@keplr-wallet/types';
 
@@ -10,8 +10,8 @@ export interface UnifiedWalletState {
   type: WalletType;
   address: string | null;
   chain: 'evm' | 'cosmos' | null;
-  provider: any;
-  signer: any;
+  provider: unknown;
+  signer: unknown;
   accounts: string[]; // All available accounts
   currentAccountIndex: number; // Current account index
   chainId: string | null; // Current chain ID
@@ -19,7 +19,7 @@ export interface UnifiedWalletState {
   disconnect: () => void;
   switchAccount: (index: number) => Promise<void>;
   switchChain: (chainId: string) => Promise<void>;
-  signAndSend: (tx: any, opts?: any) => Promise<any>;
+  signAndSend: (tx: unknown, opts?: unknown) => Promise<unknown>;
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
@@ -29,8 +29,8 @@ export function useUnifiedWallet(): UnifiedWalletState {
   const [type, setType] = useState<WalletType>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [chain, setChain] = useState<'evm' | 'cosmos' | null>(null);
-  const [provider, setProvider] = useState<any>(null);
-  const [signer, setSigner] = useState<any>(null);
+  const [provider, setProvider] = useState<unknown>(null);
+  const [signer, setSigner] = useState<unknown>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
   const [currentAccountIndex, setCurrentAccountIndex] = useState<number>(0);
   const [chainId, setChainId] = useState<string | null>(null);
@@ -48,41 +48,45 @@ export function useUnifiedWallet(): UnifiedWalletState {
     setError(null);
 
     try {
-      // Get current chain ID
-      const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-      setChainId(currentChainId);
+      if (window.ethereum && typeof window.ethereum.request === 'function') {
+        // Get current chain ID
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' }) as string;
+        setChainId(currentChainId);
 
-      // Request all accounts
-      const allAccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      setAccounts(allAccounts);
+        // Request all accounts
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
+        setAccounts(accounts);
 
-      // Get the currently selected account
-      const selectedAccounts = await window.ethereum.request({ method: 'eth_accounts' });
-      const currentAddress = selectedAccounts[0];
-      const currentIndex = allAccounts.findIndex((acc: string) => acc.toLowerCase() === currentAddress.toLowerCase());
-      
-      // Create provider and signer
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-      const ethersSigner = await ethersProvider.getSigner();
-      
-      console.log('Connected to MetaMask:', {
-        address: currentAddress,
-        allAccounts: allAccounts,
-        currentIndex: currentIndex,
-        chainId: currentChainId
-      });
-      
-      setType('evm-external');
-      setChain('evm');
-      setProvider(ethersProvider);
-      setSigner(ethersSigner);
-      setAddress(currentAddress);
-      setCurrentAccountIndex(currentIndex >= 0 ? currentIndex : 0);
-      setIsConnected(true);
-      setIsConnecting(false);
-    } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      setError(error?.message || 'Failed to connect to MetaMask');
+        // Get the currently selected account
+        const selectedAccounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
+        const currentAddress = selectedAccounts[0];
+        const currentIndex = accounts.findIndex((acc) => acc.toLowerCase() === currentAddress.toLowerCase());
+        
+        // Create provider and signer
+        if (!window.ethereum) throw new Error('window.ethereum is not available');
+        const ethersProvider = new ethers.BrowserProvider(window.ethereum);
+        const ethersSigner = await ethersProvider.getSigner();
+        
+        console.log('Connected to MetaMask:', {
+          address: currentAddress,
+          allAccounts: accounts,
+          currentIndex: currentIndex,
+          chainId: currentChainId
+        });
+        
+        setType('evm-external');
+        setChain('evm');
+        setProvider(ethersProvider);
+        setSigner(ethersSigner);
+        setAddress(currentAddress);
+        setCurrentAccountIndex(currentIndex >= 0 ? currentIndex : 0);
+        setIsConnected(true);
+        setIsConnecting(false);
+      } else {
+        throw new Error('window.ethereum is not available or does not support request');
+      }
+    } catch (error: unknown) {
+      setError((error as { message?: string })?.message ?? (typeof error === 'string' ? error : null));
       setIsConnecting(false);
       throw error;
     }
@@ -97,10 +101,11 @@ export function useUnifiedWallet(): UnifiedWalletState {
     try {
       // MetaMask doesn't have a direct method to switch accounts
       // We need to request the user to switch manually
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
       const newAddress = accounts[index];
       
       if (newAddress) {
+        if (!window.ethereum) throw new Error('window.ethereum is not available');
         const ethersProvider = new ethers.BrowserProvider(window.ethereum);
         const ethersSigner = await ethersProvider.getSigner();
         
@@ -110,9 +115,8 @@ export function useUnifiedWallet(): UnifiedWalletState {
         
         console.log('Switched to account:', newAddress);
       }
-    } catch (error: any) {
-      console.error('Failed to switch account:', error);
-      setError(error?.message || 'Failed to switch account');
+    } catch (error: unknown) {
+      setError((error as { message?: string })?.message ?? (typeof error === 'string' ? error : null));
       throw error;
     }
   }, [type]);
@@ -205,9 +209,8 @@ export function useUnifiedWallet(): UnifiedWalletState {
         await connect({ type: 'cosmos-external' });
         setChainId(targetChainId);
         console.log('Connected to SEI:', targetChainId);
-      } catch (error: any) {
-        console.error('Failed to connect to SEI:', error);
-        setError(error?.message || 'Failed to connect to SEI');
+      } catch (error: unknown) {
+        setError((error as { message?: string })?.message ?? (typeof error === 'string' ? error : null));
         throw error;
       }
       return;
@@ -226,12 +229,11 @@ export function useUnifiedWallet(): UnifiedWalletState {
       
       // Update chain ID
       const newChainId = await window.ethereum.request({ method: 'eth_chainId' });
-      setChainId(newChainId);
+      setChainId(newChainId as string);
       
       console.log('Switched to chain:', newChainId);
-    } catch (error: any) {
-      console.error('Failed to switch chain:', error);
-      setError(error?.message || 'Failed to switch chain');
+    } catch (error: unknown) {
+      setError((error as { message?: string })?.message ?? (typeof error === 'string' ? error : null));
       throw error;
     }
   }, [type, connect]);
@@ -251,6 +253,7 @@ export function useUnifiedWallet(): UnifiedWalletState {
           const newIndex = accounts.findIndex((acc: string) => acc.toLowerCase() === newAddress.toLowerCase());
           
           // Update provider and signer
+          if (!window.ethereum) throw new Error('window.ethereum is not available');
           const ethersProvider = new ethers.BrowserProvider(window.ethereum);
           const ethersSigner = await ethersProvider.getSigner();
           
@@ -268,6 +271,7 @@ export function useUnifiedWallet(): UnifiedWalletState {
         setChainId(chainId);
         
         // Update provider and signer for new chain
+        if (!window.ethereum) throw new Error('window.ethereum is not available');
         const ethersProvider = new ethers.BrowserProvider(window.ethereum);
         const ethersSigner = await ethersProvider.getSigner();
         setProvider(ethersProvider);
@@ -284,31 +288,62 @@ export function useUnifiedWallet(): UnifiedWalletState {
         disconnect();
       };
 
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
-      window.ethereum.on('connect', handleConnect);
-      window.ethereum.on('disconnect', handleDisconnect);
+      // Adapter event handlers for MetaMask
+      const accountsChangedAdapter = (...args: unknown[]) => {
+        if (Array.isArray(args[0]) && args[0].every(a => typeof a === 'string')) {
+          handleAccountsChanged(args[0] as string[]);
+        }
+      };
+      const chainChangedAdapter = (...args: unknown[]) => {
+        if (typeof args[0] === 'string') {
+          handleChainChanged(args[0]);
+        }
+      };
+      const connectAdapter = (...args: unknown[]) => {
+        if (typeof args[0] === 'object' && args[0] !== null && 'chainId' in args[0]) {
+          handleConnect(args[0] as { chainId: string });
+        }
+      };
+      const disconnectAdapter = (...args: unknown[]) => {
+        if (typeof args[0] === 'object' && args[0] !== null && 'code' in args[0] && 'message' in args[0]) {
+          handleDisconnect(args[0] as { code: number; message: string });
+        }
+      };
+      if (typeof window.ethereum.on === 'function') {
+        window.ethereum.on('accountsChanged', accountsChangedAdapter);
+        window.ethereum.on('chainChanged', chainChangedAdapter);
+        window.ethereum.on('connect', connectAdapter);
+        window.ethereum.on('disconnect', disconnectAdapter);
+      }
 
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-        window.ethereum.removeListener('connect', handleConnect);
-        window.ethereum.removeListener('disconnect', handleDisconnect);
+        if (typeof window.ethereum?.removeListener === 'function') {
+          window.ethereum.removeListener('accountsChanged', accountsChangedAdapter);
+          window.ethereum.removeListener('chainChanged', chainChangedAdapter);
+          window.ethereum.removeListener('connect', connectAdapter);
+          window.ethereum.removeListener('disconnect', disconnectAdapter);
+        }
       };
     }
   }, [type, disconnect]);
 
   // Unified sign and send
-  const signAndSend = useCallback(async (tx: any, opts?: any) => {
+  const signAndSend = useCallback(async (tx: unknown) => {
     if (chain === 'evm') {
       // EVM: tx is ethers.js transaction request
       if (!signer) throw new Error('No EVM signer');
-      return await signer.sendTransaction(tx);
+      return await (signer as { sendTransaction: (tx: unknown) => Promise<unknown> }).sendTransaction(tx);
     } else if (chain === 'cosmos') {
       // Cosmos: tx is { msgs, fee, memo, chainId, rpc }
       if (!signer || !address) throw new Error('No Cosmos signer');
-      const client = await SigningStargateClient.connectWithSigner(tx.rpc, signer as OfflineSigner);
-      return await client.signAndBroadcast(address, tx.msgs, tx.fee, tx.memo || '');
+      const cosmosTx = tx as { rpc: string; msgs: unknown[]; fee: unknown; memo?: string };
+      const client = await SigningStargateClient.connectWithSigner(cosmosTx.rpc, signer as OfflineSigner);
+      return await client.signAndBroadcast(
+        address,
+        cosmosTx.msgs as import('@cosmjs/proto-signing').EncodeObject[],
+        cosmosTx.fee as import('@cosmjs/stargate').StdFee,
+        cosmosTx.memo || ''
+      );
     }
     throw new Error('No wallet connected');
   }, [chain, signer, address]);

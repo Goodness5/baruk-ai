@@ -1,3 +1,18 @@
+# 🚀 UI Overhaul Incoming: Sci-Fi Simplicity for Everyone
+
+This app is undergoing a complete UI transformation:
+
+- **Sci-fi, CIA-movie inspired design**: Neon, holographic, and HUD-style visuals
+- **Ultra-simple, jargon-free experience**: All web3 terms are abstracted away—if a 3-year-old can use it, anyone can
+- **AI Agent at your service**: A friendly, persistent AI guide helps you navigate, answers questions, and can even take actions for you
+- **Unified dashboard**: All features (Trade, Grow, Borrow, Insights, Triggers) are accessible from a single, interactive home screen
+- **Full integration**: Every feature is seamlessly connected and easy to use
+
+**Docs:**
+- Full GitBook-style documentation will be available in `/docs` (coming soon!)
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

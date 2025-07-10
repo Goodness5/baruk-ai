@@ -1,6 +1,8 @@
-"use client"
+"use client";
 import { useAppStore } from '../store/useAppStore';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol } from '../lib/seiProtocols';
 
 const pools = [
@@ -38,12 +40,23 @@ export default function PoolsPage() {
   const getPrice = (address: string) => tokenPrices[address.toLowerCase()];
 
   return (
-    <div className="max-w-3xl mx-auto mt-10 space-y-8">
+    <motion.div
+      className="max-w-3xl mx-auto mt-10 space-y-8"
+      initial={{ opacity: 0, y: 40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      {/* AI Agent Tip */}
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-white">Farming Pools</h1>
+        <SparklesIcon className="h-7 w-7 neon-text animate-pulse" />
+        <div className="text-lg neon-text font-bold">AI Tip:</div>
+        <div className="text-white/80 text-sm">Stake your tokens in a pool to earn magic rewards! I’ll help you find the best pools and keep track of your garden.</div>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-2xl font-bold neon-text">Pools</h1>
         <div className="ml-auto">
           <select
-            className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
+            className="bg-black/40 border border-neon-cyan text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
             value={protocolId}
             onChange={e => setProtocolId(e.target.value)}
           >
@@ -53,34 +66,34 @@ export default function PoolsPage() {
           </select>
         </div>
       </div>
-      <div className="text-purple-300 text-sm mb-2">Selected Protocol: <span className="font-bold">{protocol?.name}</span></div>
+      <div className="neon-text text-sm mb-2">Selected Magic Engine: <span className="font-bold">{protocol?.name}</span></div>
       <div className="grid md:grid-cols-2 gap-6">
         {pools.map((pool) => (
-          <div key={pool.name} className="rounded-2xl p-6 bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl">
+          <div key={pool.name} className="rounded-2xl p-6 hud-glass neon-border">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-lg font-semibold text-purple-200">{pool.name}</div>
+              <div className="text-lg font-semibold neon-text">{pool.name}</div>
             </div>
             <div className="flex flex-col gap-2 mt-2">
-              <div className="flex gap-2 text-xs text-purple-200">
+              <div className="flex gap-2 text-xs neon-text">
                 {pool.tokens.map(addr => (
                   <span key={addr} className="flex-1">
                     {getSymbol(addr)}: {tokenPricesLoading ? 'Loading...' : tokenPricesError ? <span className="text-red-400">{tokenPricesError}</span> : getPrice(addr) ? `$${getPrice(addr).toFixed(4)}` : 'No price'}
                   </span>
                 ))}
               </div>
-              <div className="flex justify-between text-purple-200">
+              <div className="flex justify-between neon-text">
                 <span>Your Stake</span>
                 <span className="text-white font-bold">{pool.yourStake}</span>
               </div>
-              <div className="flex justify-between text-purple-200">
-                <span>Rewards</span>
+              <div className="flex justify-between neon-text">
+                <span>Magic Rewards</span>
                 <span className="text-white font-bold">{pool.rewards}</span>
               </div>
             </div>
-            <button className="mt-6 w-full py-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold shadow-lg hover:opacity-90 transition">Stake / Unstake</button>
+            <button className="mt-6 w-full py-2 rounded-lg bg-gradient-to-r from-neon-cyan via-neon-green to-neon-purple neon-text font-bold shadow-lg hover:opacity-90 transition">Stake / Unstake</button>
           </div>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 } 

@@ -1,0 +1,1 @@
+# FAQ\n\n**Q:** Is this safe for beginners?\n**A:** Yes! The AI and UI are designed for all ages.\n\n**Q:** Can the AI make trades for me?\n**A:** Yes, with your confirmation. The AI can trigger any DeFi action you want.\n\n**Q:** What if I get lost?\n**A:** Just ask the AI Orb for help or to take you where you want to go!\n

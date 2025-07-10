@@ -11,7 +11,6 @@ const erc20Abi = [
   }
 ] as const; // Use a minimal ERC20 ABI if available
 import type { Token } from '../store/useAppStore';
-import { useUnifiedWallet } from './unifiedWallet';
 
 const client = createPublicClient({
   chain: mainnet,

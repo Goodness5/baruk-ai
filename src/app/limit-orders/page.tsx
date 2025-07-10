@@ -1,5 +1,7 @@
-"use client"
+"use client";
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
 import { useContractInteraction } from '../lib/contracts';
@@ -13,7 +15,7 @@ const orders = [
   { id: 2, pair: 'ETH/DAI', type: 'Sell', price: '1850', amount: '0.5', status: 'Filled' },
 ];
 
-export default function LimitOrdersPage() {
+export default function TriggersPage() {
   const address = useAppStore(s => s.address);
   const balances = useAppStore(s => s.balances);
   const tokenPrices = useAppStore(s => s.tokenPrices);
@@ -45,10 +47,10 @@ export default function LimitOrdersPage() {
     return num.toFixed(4);
   };
 
-  const handlePlaceOrder = async () => {
+  const handlePlaceTrigger = async () => {
     if (!address || !amount || !price || loading || !isConnected) return;
     setLoading(true);
-    toast.loading('Placing limit order...', { id: 'limit-order' });
+    toast.loading('Setting your trigger...', { id: 'trigger' });
     try {
       await executeContract(
         protocol.type,
@@ -57,21 +59,38 @@ export default function LimitOrdersPage() {
         [tokenIn, tokenOut, BigInt(amount), BigInt(price)],
         { account: address }
       );
-      toast.success('Limit order placed!', { id: 'limit-order' });
-    } catch (err: any) {
-      toast.error('Order failed: ' + (err?.message || err), { id: 'limit-order' });
+      toast.success('Trigger set! 🚦', { id: 'trigger' });
+    } catch (err: unknown) {
+      let msg = 'Failed to fetch limit orders';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error('Could not set trigger: ' + msg, { id: 'trigger' });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-10 p-8 rounded-2xl bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] shadow-xl space-y-8">
+    <motion.div
+      className="max-w-lg mx-auto mt-10 p-8 rounded-2xl hud-glass neon-border shadow-xl space-y-8"
+      initial={{ opacity: 0, y: 40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+    >
+      {/* AI Agent Tip */}
       <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-2xl font-bold text-white">Limit Orders</h1>
+        <SparklesIcon className="h-7 w-7 neon-text animate-pulse" />
+        <div className="text-lg neon-text font-bold">AI Tip:</div>
+        <div className="text-white/80 text-sm">Set a trigger to buy or sell automatically at your magic price. I’ll watch the market for you!</div>
+      </div>
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-2xl font-bold neon-text">Triggers</h1>
         <div className="ml-auto">
           <select
-            className="bg-[#1e2e2e] border border-purple-700 text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
+            className="bg-black/40 border border-neon-cyan text-white rounded-lg px-3 py-1 text-sm focus:outline-none"
             value={protocolId}
             onChange={e => setProtocolId(e.target.value)}
           >
@@ -81,78 +100,75 @@ export default function LimitOrdersPage() {
           </select>
         </div>
       </div>
-
       {/* Real-time Balance Display */}
-      <div className="bg-gradient-to-br from-purple-800/40 via-blue-800/40 to-green-800/40 rounded-lg p-4 border border-purple-700/30">
+      <div className="bg-black/40 rounded-lg p-4 border border-neon-cyan/20">
         <div className="text-white font-semibold mb-3 flex items-center gap-2">
           <span>💰</span>
-          Token Balances
+          My Magic Vault
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token In</div>
+            <div className="text-neon-cyan text-sm">From</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(balanceIn)}
             </div>
             {priceIn && (
-              <div className="text-green-400 text-sm">
+              <div className="text-neon-green text-sm">
                 ${getUSDValue(balanceIn, priceIn)}
               </div>
             )}
-            <div className="text-purple-400 text-xs mt-1">
-              {tokenPricesLoading ? 'Loading price...' : priceIn ? `$${priceIn.toFixed(4)}` : 'No price'}
+            <div className="text-neon-cyan text-xs mt-1">
+              {tokenPricesLoading ? 'Loading...' : priceIn ? `$${priceIn.toFixed(4)}` : 'No price'}
             </div>
           </div>
           <div className="text-center">
-            <div className="text-purple-300 text-sm">Token Out</div>
+            <div className="text-neon-cyan text-sm">To</div>
             <div className="text-white font-bold text-lg">
               {formatBalance(balanceOut)}
             </div>
             {priceOut && (
-              <div className="text-green-400 text-sm">
+              <div className="text-neon-green text-sm">
                 ${getUSDValue(balanceOut, priceOut)}
               </div>
             )}
-            <div className="text-purple-400 text-xs mt-1">
-              {tokenPricesLoading ? 'Loading price...' : priceOut ? `$${priceOut.toFixed(4)}` : 'No price'}
+            <div className="text-neon-cyan text-xs mt-1">
+              {tokenPricesLoading ? 'Loading...' : priceOut ? `$${priceOut.toFixed(4)}` : 'No price'}
             </div>
           </div>
         </div>
       </div>
-
       <div className="flex flex-col gap-4">
         <div className="flex gap-2">
           <TokenSelector tokens={protocolTokens} value={tokenIn} onChange={setTokenIn} className="flex-1" />
-          <span className="text-purple-300 font-bold">→</span>
-          <TokenSelector tokens={protocolTokens} value={tokenOut} onChange={setTokenOut} className="flex-1 border-green-700" />
+          <span className="neon-text font-bold">→</span>
+          <TokenSelector tokens={protocolTokens} value={tokenOut} onChange={setTokenOut} className="flex-1" />
         </div>
-        
         <input
-          className="w-full bg-[#2d193c] text-white rounded-lg px-4 py-2 border border-purple-700 focus:outline-none"
+          className="w-full bg-black/40 text-white rounded-lg px-4 py-2 border border-neon-cyan focus:outline-none"
           placeholder="Amount"
           value={amount}
           onChange={e => setAmount(e.target.value)}
         />
         <input
-          className="w-full bg-[#2d193c] text-white rounded-lg px-4 py-2 border border-green-700 focus:outline-none"
-          placeholder="Price"
+          className="w-full bg-black/40 text-white rounded-lg px-4 py-2 border border-neon-green focus:outline-none"
+          placeholder="Magic Price"
           value={price}
           onChange={e => setPrice(e.target.value)}
         />
         <button
-          className="w-full py-3 mt-2 rounded-lg bg-gradient-to-r from-purple-600 via-green-500 to-purple-700 text-white font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
-          onClick={handlePlaceOrder}
+          className="w-full py-3 mt-2 rounded-lg bg-gradient-to-r from-neon-cyan via-neon-green to-neon-purple neon-text font-bold text-lg shadow-lg hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-60"
+          onClick={handlePlaceTrigger}
           disabled={!address || !amount || !price || loading || !isConnected}
         >
-          {loading && <span className="loader border-2 border-t-2 border-purple-400 rounded-full w-5 h-5 animate-spin"></span>}
-          {loading ? 'Placing...' : 'Place Order'}
+          {loading && <span className="loader border-2 border-t-2 border-neon-cyan rounded-full w-5 h-5 animate-spin"></span>}
+          {loading ? 'Setting...' : 'Set Trigger'}
         </button>
       </div>
-      <div className="bg-gradient-to-br from-purple-800/80 via-purple-700/60 to-green-700/40 rounded-xl p-6 shadow-lg">
-        <div className="text-purple-200 mb-2 font-semibold">Open/Recent Orders</div>
+      <div className="hud-glass neon-border rounded-xl p-6 shadow-lg">
+        <div className="neon-text mb-2 font-semibold">Open/Recent Triggers</div>
         <table className="w-full text-left">
           <thead>
-            <tr className="text-purple-300">
+            <tr className="text-neon-cyan">
               <th>Pair</th>
               <th>Type</th>
               <th>Price</th>
@@ -163,7 +179,7 @@ export default function LimitOrdersPage() {
           </thead>
           <tbody>
             {orders.map(order => (
-              <tr key={order.id} className="text-white border-b border-purple-900/30">
+              <tr key={order.id} className="text-white border-b border-neon-cyan/20">
                 <td>{order.pair}</td>
                 <td>{order.type}</td>
                 <td>{order.price}</td>
@@ -175,10 +191,18 @@ export default function LimitOrdersPage() {
           </tbody>
         </table>
       </div>
-      <div className="mt-8 bg-gradient-to-br from-[#2d193c] via-[#1e2e2e] to-[#3a1c4a] rounded-xl p-6 shadow-lg">
-        <div className="text-purple-200 mb-2 font-semibold">Order Book (Mock)</div>
-        <div className="h-32 flex items-center justify-center text-purple-400">Order book visualization coming soon...</div>
+      <div className="mt-8 hud-glass neon-border rounded-xl p-6 shadow-lg">
+        <div className="neon-text mb-2 font-semibold">Trigger Book (Mock)</div>
+        <div className="h-32 flex items-center justify-center text-neon-cyan/80">Trigger book visualization coming soon...</div>
       </div>
-    </div>
+      <style jsx>{`
+        .loader {
+          border-top-color: #22d3ee;
+          border-right-color: #a855f7;
+          border-bottom-color: #22d37a;
+          border-left-color: transparent;
+        }
+      `}</style>
+    </motion.div>
   );
 } 
