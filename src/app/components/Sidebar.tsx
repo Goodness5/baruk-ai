@@ -13,7 +13,7 @@ const nav = [
 
 export default function Sidebar() {
   return (
-    <aside className="hidden md:flex flex-col w-56 bg-gradient-to-b from-[#3a1c4a] via-[#2d193c] to-[#1e2e2e] p-6 space-y-4 shadow-lg">
+    <aside className="hidden md:flex flex-col w-56 holo-surface p-6 space-y-4 shadow-lg">
       <div className="text-2xl font-bold mb-8 tracking-tight bg-gradient-to-r from-green-400 via-purple-400 to-purple-700 bg-clip-text text-transparent">Baruk DeFi</div>
       <nav className="flex flex-col gap-2">
         {nav.map(({ name, href, icon: Icon }) => (
