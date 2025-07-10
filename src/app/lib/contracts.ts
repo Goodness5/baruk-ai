@@ -1,4 +1,4 @@
-import { getContract, createWalletClient, custom, type WalletClient } from 'viem';
+import { getContract, createWalletClient, custom, type WalletClient, Abi } from 'viem';
 import { client } from './web3';
 import { useUnifiedWallet } from './unifiedWallet';
 import { SigningStargateClient } from '@cosmjs/stargate';
@@ -8,58 +8,58 @@ import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 export function useContractInteraction() {
   const { type, chain, signer, signAndSend } = useUnifiedWallet();
 
-  const executeEVMContract = async (contractAddress: string, abi: any, method: string, args: any[], options?: any) => {
+  const executeEVMContract = async (contractAddress: string, abi: Abi, method: string, args: unknown[], options?: Record<string, unknown>) => {
     if (chain !== 'evm' || !signer) throw new Error('EVM wallet not connected');
     
     // For external wallets, use window.ethereum
     if (type === 'evm-external' && window.ethereum) {
       const walletClient = createWalletClient({
-        transport: custom(window.ethereum)
+        transport: custom(window.ethereum as any)
       });
       
       const contract = getContract({
         address: contractAddress as `0x${string}`,
-        abi: abi as any,
+        abi: abi,
         client: walletClient
       });
 
-      return await contract.write[method](args, options);
+      return await (contract.write[method] as (...args: unknown[]) => Promise<unknown>)(...args, options);
     } else {
       // For internal wallets, use the signer directly with ethers
       // Since viem doesn't work well with ethers signers, we'll use ethers directly
       const { ethers } = await import('ethers');
-      const contract = new ethers.Contract(contractAddress, abi, signer);
+      const contract = new ethers.Contract(contractAddress, abi as any, signer);
       return await contract[method](...args, options);
     }
   };
 
-  const executeCosmosContract = async (contractAddress: string, msg: any, options?: any) => {
+  const executeCosmosContract = async (contractAddress: string, msg: Record<string, unknown>, options?: Record<string, unknown>) => {
     if (chain !== 'cosmos' || !signer) throw new Error('Cosmos wallet not connected');
     
     const executeMsg = {
       typeUrl: '/cosmwasm.wasm.v1.MsgExecuteContract',
       value: MsgExecuteContract.fromPartial({
-        sender: options?.sender || '',
+        sender: (options?.sender as string) || '',
         contract: contractAddress,
         msg: Buffer.from(JSON.stringify(msg)),
-        funds: options?.funds || []
+        funds: (options?.funds as { denom: string; amount: string }[]) || []
       })
     };
 
     const client = await SigningStargateClient.connectWithSigner(
-      options?.rpc || 'https://rpc.atlantic-2.seinetwork.io',
+      (options?.rpc as string) || 'https://rpc.atlantic-2.seinetwork.io',
       signer
     );
 
     return await client.signAndBroadcast(
-      options?.sender || '',
+      (options?.sender as string) || '',
       [executeMsg],
-      options?.fee || { amount: [{ denom: 'usei', amount: '1000' }], gas: '200000' },
-      options?.memo || ''
+      (options?.fee as { amount: { denom: string; amount: string }[]; gas: string }) || { amount: [{ denom: 'usei', amount: '1000' }], gas: '200000' },
+      (options?.memo as string) || ''
     );
   };
 
-  const executeContract = async (protocol: 'baruk' | 'astroport' | 'vortex', contractType: string, method: string, args: any[], options?: any) => {
+  const executeContract = async (protocol: 'baruk' | 'astroport' | 'vortex', contractType: string, method: string, args: unknown[], options?: Record<string, unknown>) => {
     if (protocol === 'baruk') {
       // Baruk uses EVM
       const { getSeiProtocolById } = await import('./seiProtocols');
@@ -68,7 +68,7 @@ export function useContractInteraction() {
       
       if (!contract) throw new Error(`Contract ${contractType} not found for Baruk`);
       
-      return await executeEVMContract(contract.address, contract.abi, method, args, options);
+      return await executeEVMContract(contract.address, contract.abi as Abi, method, args, options);
     } else {
       // Astroport/Vortex use Cosmos
       const { getSeiProtocolById } = await import('./seiProtocols');

@@ -8,6 +8,7 @@ import BarukLimitOrderAbi from '../../abi/BarukLimitOrder.json';
 import BarukYieldFarmAbi from '../../abi/BarukYieldFarm.json';
 import BarukFactoryAbi from '../../abi/BarukAMMFactory.json';
 import type { Token } from '../store/useAppStore';
+import type { Abi } from 'viem';
 
 // Astroport and Vortex: CosmWasm schemas (not EVM ABIs)
 // These are typically JSON schemas for execute/query messages
@@ -19,14 +20,14 @@ export type SeiProtocol = {
   type: 'baruk' | 'astroport' | 'vortex';
   logoUrl?: string;
   contracts: {
-    router?: { address: string; abi?: any; schemaPath?: string };
-    amm?: { address: string; abi?: any; schemaPath?: string };
-    lending?: { address: string; abi?: any; schemaPath?: string };
-    limitOrder?: { address: string; abi?: any; schemaPath?: string };
-    yieldFarm?: { address: string; abi?: any; schemaPath?: string };
-    factory?: { address: string; abi?: any; schemaPath?: string };
+    router?: { address: string; abi?: Abi; schemaPath?: string };
+    amm?: { address: string; abi?: Abi; schemaPath?: string };
+    lending?: { address: string; abi?: Abi; schemaPath?: string };
+    limitOrder?: { address: string; abi?: Abi; schemaPath?: string };
+    yieldFarm?: { address: string; abi?: Abi; schemaPath?: string };
+    factory?: { address: string; abi?: Abi; schemaPath?: string };
     // For CosmWasm, use schemaPath or messageTypes
-    [key: string]: any;
+    [key: string]: unknown;
   };
   services: ('swap' | 'liquidity' | 'lending' | 'limitOrder' | 'farm')[];
   description?: string;

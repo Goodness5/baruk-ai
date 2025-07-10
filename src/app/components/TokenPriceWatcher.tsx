@@ -17,8 +17,14 @@ export default function TokenPriceWatcher() {
       try {
         const prices = await fetchTokenPrices(tokens.map(t => t.address));
         if (active) setTokenPrices(prices);
-      } catch (err: any) {
-        if (active) setTokenPricesError(err?.message || 'Failed to fetch prices');
+      } catch (err: unknown) {
+        if (active) {
+          if (typeof err === 'object' && err !== null && 'message' in err) {
+            setTokenPricesError((err as { message?: string }).message || 'Failed to fetch prices');
+          } else {
+            setTokenPricesError('Failed to fetch prices');
+          }
+        }
       } finally {
         if (active) setTokenPricesLoading(false);
       }

@@ -6,13 +6,13 @@ export type AIMessage = {
   role: 'user' | 'ai';
   content: string;
   action?: string;
-  data?: any;
+  data?: unknown;
 };
 
 interface AIState {
   chat: AIMessage[];
   input: string;
-  pendingAction?: { action: string; data?: any };
+  pendingAction?: { action: string; data?: unknown };
 }
 
 const initialState: AIState = {
@@ -26,7 +26,7 @@ const initialState: AIState = {
 type AIAction =
   | { type: 'SEND_MESSAGE'; message: AIMessage }
   | { type: 'SET_INPUT'; input: string }
-  | { type: 'TRIGGER_ACTION'; action: string; data?: any }
+  | { type: 'TRIGGER_ACTION'; action: string; data?: unknown }
   | { type: 'CLEAR_ACTION' };
 
 function aiReducer(state: AIState, action: AIAction): AIState {

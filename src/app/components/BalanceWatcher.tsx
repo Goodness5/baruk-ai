@@ -39,8 +39,12 @@ export default function BalanceWatcher() {
       setBalances(newBalances);
       setBalancesLoading(false);
       setLastUpdate(new Date());
-    } catch (err: any) {
-      setBalancesError(err?.message || 'Failed to fetch balances');
+    } catch (err: unknown) {
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        setBalancesError((err as { message?: string }).message || 'Failed to fetch balances');
+      } else {
+        setBalancesError('Failed to fetch balances');
+      }
       setBalancesLoading(false);
     }
   };

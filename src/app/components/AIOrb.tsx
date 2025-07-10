@@ -42,12 +42,15 @@ export default function AIOrb() {
     if (e.key === "Enter") handleSend();
   };
 
-  const handleQuickAction = (action: string, data?: any) => {
+  const handleQuickAction = (action: string, data?: unknown) => {
     dispatch({ type: "TRIGGER_ACTION", action, data });
     setOpen(false);
     // For navigation, use window.location for now
-    if (action === "navigate" && data?.page) {
-      window.location.href = data.page;
+    if (action === "navigate" && data) {
+      const dataObj = data as { page: string };
+      if (dataObj.page) {
+        window.location.href = dataObj.page;
+      }
     }
   };
 
