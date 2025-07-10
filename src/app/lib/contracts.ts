@@ -2,6 +2,12 @@ import { getContract, createWalletClient, custom, Abi } from 'viem';
 import { useUnifiedWallet } from './unifiedWallet';
 import { SigningStargateClient } from '@cosmjs/stargate';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
+import type { InterfaceAbi, ContractRunner } from 'ethers';
+
+// Minimal EIP-1193 provider interface for viem
+interface EthereumProvider {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}
 
 // Unified contract interaction utility
 export function useContractInteraction() {
@@ -13,7 +19,7 @@ export function useContractInteraction() {
     // For external wallets, use window.ethereum
     if (type === 'evm-external' && window.ethereum) {
       const walletClient = createWalletClient({
-        transport: custom(window.ethereum as unknown)
+        transport: custom(window.ethereum as EthereumProvider)
       });
       
       const contract = getContract({
@@ -26,8 +32,13 @@ export function useContractInteraction() {
     } else {
       // For internal wallets, use the signer directly with ethers
       // Since viem doesn't work well with ethers signers, we'll use ethers directly
-      const { ethers } = await import('ethers');
-      const contract = new ethers.Contract(contractAddress, abi as unknown, signer as { [key: string]: unknown });
+      const ethersModule = await import('ethers');
+      const { Contract } = ethersModule;
+      const contract = new Contract(
+        contractAddress,
+        abi as InterfaceAbi,
+        signer as ContractRunner
+      );
       return await contract[method](...args, options);
     }
   };
@@ -47,7 +58,7 @@ export function useContractInteraction() {
 
     const client = await SigningStargateClient.connectWithSigner(
       (options?.rpc as string) || 'https://rpc.atlantic-2.seinetwork.io',
-      signer as unknown
+      signer as import('@cosmjs/proto-signing').OfflineSigner
     );
 
     return await client.signAndBroadcast(
