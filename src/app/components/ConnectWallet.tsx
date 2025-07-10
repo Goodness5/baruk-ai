@@ -29,7 +29,6 @@ export default function ConnectWallet() {
   const { 
     type, 
     address, 
-    chain, 
     accounts, 
     currentAccountIndex, 
     chainId,

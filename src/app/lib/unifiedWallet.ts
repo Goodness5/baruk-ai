@@ -19,7 +19,7 @@ export interface UnifiedWalletState {
   disconnect: () => void;
   switchAccount: (index: number) => Promise<void>;
   switchChain: (chainId: string) => Promise<void>;
-  signAndSend: (tx: any, opts?: any) => Promise<any>;
+  signAndSend: (tx: unknown, opts?: unknown) => Promise<unknown>;
   isConnected: boolean;
   isConnecting: boolean;
   error: string | null;
@@ -319,16 +319,17 @@ export function useUnifiedWallet(): UnifiedWalletState {
   }, [type, disconnect]);
 
   // Unified sign and send
-  const signAndSend = useCallback(async (tx: any, opts?: any) => {
+  const signAndSend = useCallback(async (tx: unknown) => {
     if (chain === 'evm') {
       // EVM: tx is ethers.js transaction request
       if (!signer) throw new Error('No EVM signer');
-      return await signer.sendTransaction(tx);
+      return await (signer as { sendTransaction: (tx: unknown) => Promise<unknown> }).sendTransaction(tx);
     } else if (chain === 'cosmos') {
       // Cosmos: tx is { msgs, fee, memo, chainId, rpc }
       if (!signer || !address) throw new Error('No Cosmos signer');
-      const client = await SigningStargateClient.connectWithSigner(tx.rpc, signer as OfflineSigner);
-      return await client.signAndBroadcast(address, tx.msgs, tx.fee, tx.memo || '');
+      const cosmosTx = tx as { rpc: string; msgs: unknown[]; fee: unknown; memo?: string };
+      const client = await SigningStargateClient.connectWithSigner(cosmosTx.rpc, signer as OfflineSigner);
+      return await client.signAndBroadcast(address, cosmosTx.msgs, cosmosTx.fee, cosmosTx.memo || '');
     }
     throw new Error('No wallet connected');
   }, [chain, signer, address]);

@@ -13,7 +13,7 @@ export function useContractInteraction() {
     // For external wallets, use window.ethereum
     if (type === 'evm-external' && window.ethereum) {
       const walletClient = createWalletClient({
-        transport: custom(window.ethereum as unknown as any)
+        transport: custom(window.ethereum as unknown)
       });
       
       const contract = getContract({
@@ -27,7 +27,7 @@ export function useContractInteraction() {
       // For internal wallets, use the signer directly with ethers
       // Since viem doesn't work well with ethers signers, we'll use ethers directly
       const { ethers } = await import('ethers');
-      const contract = new ethers.Contract(contractAddress, abi as any, signer);
+      const contract = new ethers.Contract(contractAddress, abi as unknown, signer as { [key: string]: unknown });
       return await contract[method](...args, options);
     }
   };
@@ -47,7 +47,7 @@ export function useContractInteraction() {
 
     const client = await SigningStargateClient.connectWithSigner(
       (options?.rpc as string) || 'https://rpc.atlantic-2.seinetwork.io',
-      signer
+      signer as unknown
     );
 
     return await client.signAndBroadcast(
@@ -67,7 +67,7 @@ export function useContractInteraction() {
       
       if (!contract) throw new Error(`Contract ${contractType} not found for Baruk`);
       
-      return await executeEVMContract(contract.address, contract.abi as Abi, method, args, options);
+      return await executeEVMContract((contract as { address: string }).address, (contract as { abi: Abi }).abi, method, args, options);
     } else {
       // Astroport/Vortex use Cosmos
       const { getSeiProtocolById } = await import('./seiProtocols');
@@ -76,7 +76,7 @@ export function useContractInteraction() {
       
       if (!contract) throw new Error(`Contract ${contractType} not found for ${protocol}`);
       
-      return await executeCosmosContract(contract.address, { [method]: args }, options);
+      return await executeCosmosContract((contract as { address: string }).address, { [method]: args }, options);
     }
   };
 

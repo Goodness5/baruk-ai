@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { fetchBalancesWithRetry } from '../lib/balance';
 import { useUnifiedWallet } from '../lib/unifiedWallet';
@@ -17,13 +17,13 @@ export default function BalanceWatcher() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
   // Use Baruk test tokens for balance watching
-  const tokens = [
+  const tokens = useMemo(() => [
     { symbol: 'TOKEN0', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
     { symbol: 'TOKEN1', address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7' },
     { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
-  ];
+  ], []);
 
-  const fetchAndUpdateBalances = async () => {
+  const fetchAndUpdateBalances = useCallback(async () => {
     if (!address || !isConnected) {
       setBalances([]);
       setBalancesLoading(false);
@@ -47,20 +47,19 @@ export default function BalanceWatcher() {
       }
       setBalancesLoading(false);
     }
-  };
+  }, [address, isConnected, setBalances, setBalancesLoading, setBalancesError, tokens]);
 
   // Initial fetch
   useEffect(() => {
     fetchAndUpdateBalances();
-  }, [address, tokens, isConnected]);
+  }, [address, tokens, isConnected, fetchAndUpdateBalances]);
 
   // Real-time updates every 10 seconds
   useEffect(() => {
     if (!address || !isConnected) return;
-    
     const interval = setInterval(fetchAndUpdateBalances, 10000); // 10 seconds
     return () => clearInterval(interval);
-  }, [address, tokens, isConnected]);
+  }, [address, tokens, isConnected, fetchAndUpdateBalances]);
 
   // Don't render anything if not connected
   if (!isConnected || !address) return null;
