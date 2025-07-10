@@ -1,0 +1,1 @@
+# Baruk DeFi Docs\n\nWelcome to the new sci-fi inspired, AI-powered DeFi app!\n\n## Getting Started\n\n- [Overview](overview.md)\n- [Features](features.md)\n- [AI Agent](ai-agent.md)\n- [FAQ](faq.md)\n
