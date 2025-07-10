@@ -13,12 +13,9 @@ const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function GrowPage() {
   const balances = useAppStore(s => s.balances);
-  const balancesLoading = useAppStore(s => s.balancesLoading);
-  const balancesError = useAppStore(s => s.balancesError);
   const address = useAppStore(s => s.address);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
-  const tokenPricesError = useAppStore(s => s.tokenPricesError);
   const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
   const protocolTokens = getProtocolTokens(protocolId);
@@ -63,8 +60,14 @@ export default function GrowPage() {
         { account: recipient }
       );
       toast.success('Your garden is growing! 🌱', { id: 'grow' });
-    } catch (err: any) {
-      toast.error('Could not grow: ' + (err?.message || err), { id: 'grow' });
+    } catch (err: unknown) {
+      let msg = 'Unknown error';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error('Could not grow: ' + msg, { id: 'grow' });
     } finally {
       setLoading(false);
     }

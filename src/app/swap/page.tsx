@@ -12,12 +12,9 @@ const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function TradePage() {
   const balances = useAppStore(s => s.balances);
-  const balancesLoading = useAppStore(s => s.balancesLoading);
-  const balancesError = useAppStore(s => s.balancesError);
   const address = useAppStore(s => s.address);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
-  const tokenPricesError = useAppStore(s => s.tokenPricesError);
   const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
   const protocolTokens = getProtocolTokens(protocolId);
@@ -60,8 +57,14 @@ export default function TradePage() {
         { account: recipient }
       );
       toast.success('Trade complete! ✨', { id: 'trade' });
-    } catch (err: any) {
-      toast.error('Trade failed: ' + (err?.message || err), { id: 'trade' });
+    } catch (err: unknown) {
+      let msg = 'Unknown error';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error('Trade failed: ' + msg, { id: 'trade' });
     } finally {
       setLoading(false);
     }

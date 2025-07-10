@@ -1,12 +1,11 @@
-import { getContract, createWalletClient, custom, type WalletClient, Abi } from 'viem';
-import { client } from './web3';
+import { getContract, createWalletClient, custom, Abi } from 'viem';
 import { useUnifiedWallet } from './unifiedWallet';
 import { SigningStargateClient } from '@cosmjs/stargate';
 import { MsgExecuteContract } from 'cosmjs-types/cosmwasm/wasm/v1/tx';
 
 // Unified contract interaction utility
 export function useContractInteraction() {
-  const { type, chain, signer, signAndSend } = useUnifiedWallet();
+  const { type, chain, signer } = useUnifiedWallet();
 
   const executeEVMContract = async (contractAddress: string, abi: Abi, method: string, args: unknown[], options?: Record<string, unknown>) => {
     if (chain !== 'evm' || !signer) throw new Error('EVM wallet not connected');
@@ -14,7 +13,7 @@ export function useContractInteraction() {
     // For external wallets, use window.ethereum
     if (type === 'evm-external' && window.ethereum) {
       const walletClient = createWalletClient({
-        transport: custom(window.ethereum as any)
+        transport: custom(window.ethereum as unknown as any)
       });
       
       const contract = getContract({

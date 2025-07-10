@@ -19,10 +19,7 @@ export default function BorrowPage() {
   const address = useAppStore(s => s.address);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
-  const tokenPricesError = useAppStore(s => s.tokenPricesError);
   const balances = useAppStore(s => s.balances);
-  const balancesLoading = useAppStore(s => s.balancesLoading);
-  const balancesError = useAppStore(s => s.balancesError);
   const [selected, setSelected] = useState(assets[0].symbol);
   const [supplyAmount, setSupplyAmount] = useState('');
   const [borrowAmount, setBorrowAmount] = useState('');
@@ -60,8 +57,14 @@ export default function BorrowPage() {
         { account: address }
       );
       toast.success('Magic stored! ✨', { id: 'supply' });
-    } catch (err: any) {
-      toast.error('Could not store: ' + (err?.message || err), { id: 'supply' });
+    } catch (err: unknown) {
+      let msg = 'Failed to store magic';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error(msg, { id: 'supply' });
     } finally {
       setLoading(false);
     }
@@ -80,8 +83,14 @@ export default function BorrowPage() {
         { account: address }
       );
       toast.success('Magic borrowed! 🪄', { id: 'borrow' });
-    } catch (err: any) {
-      toast.error('Could not borrow: ' + (err?.message || err), { id: 'borrow' });
+    } catch (err: unknown) {
+      let msg = 'Failed to borrow magic';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error(msg, { id: 'borrow' });
     } finally {
       setLoading(false);
     }

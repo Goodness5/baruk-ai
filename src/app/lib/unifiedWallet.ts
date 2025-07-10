@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ethers, Wallet as EthersWallet } from 'ethers';
-import { DirectSecp256k1HdWallet, OfflineSigner, Registry, encodePubkey } from '@cosmjs/proto-signing';
+import { ethers } from 'ethers';
+import { DirectSecp256k1HdWallet, OfflineSigner } from '@cosmjs/proto-signing';
 import { SigningStargateClient } from '@cosmjs/stargate';
 import { Window as KeplrWindow } from '@keplr-wallet/types';
 
@@ -10,8 +10,8 @@ export interface UnifiedWalletState {
   type: WalletType;
   address: string | null;
   chain: 'evm' | 'cosmos' | null;
-  provider: any;
-  signer: any;
+  provider: unknown;
+  signer: unknown;
   accounts: string[]; // All available accounts
   currentAccountIndex: number; // Current account index
   chainId: string | null; // Current chain ID
@@ -29,8 +29,8 @@ export function useUnifiedWallet(): UnifiedWalletState {
   const [type, setType] = useState<WalletType>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [chain, setChain] = useState<'evm' | 'cosmos' | null>(null);
-  const [provider, setProvider] = useState<any>(null);
-  const [signer, setSigner] = useState<any>(null);
+  const [provider, setProvider] = useState<unknown>(null);
+  const [signer, setSigner] = useState<unknown>(null);
   const [accounts, setAccounts] = useState<string[]>([]);
   const [currentAccountIndex, setCurrentAccountIndex] = useState<number>(0);
   const [chainId, setChainId] = useState<string | null>(null);
@@ -80,9 +80,14 @@ export function useUnifiedWallet(): UnifiedWalletState {
       setCurrentAccountIndex(currentIndex >= 0 ? currentIndex : 0);
       setIsConnected(true);
       setIsConnecting(false);
-    } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      setError(error?.message || 'Failed to connect to MetaMask');
+    } catch (error: unknown) {
+      let msg = 'MetaMask connection error';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        msg = (error as { message?: string }).message || msg;
+      } else if (typeof error === 'string') {
+        msg = error;
+      }
+      setError(msg);
       setIsConnecting(false);
       throw error;
     }
@@ -110,9 +115,14 @@ export function useUnifiedWallet(): UnifiedWalletState {
         
         console.log('Switched to account:', newAddress);
       }
-    } catch (error: any) {
-      console.error('Failed to switch account:', error);
-      setError(error?.message || 'Failed to switch account');
+    } catch (error: unknown) {
+      let msg = 'Failed to switch account';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        msg = (error as { message?: string }).message || msg;
+      } else if (typeof error === 'string') {
+        msg = error;
+      }
+      setError(msg);
       throw error;
     }
   }, [type]);
@@ -205,9 +215,14 @@ export function useUnifiedWallet(): UnifiedWalletState {
         await connect({ type: 'cosmos-external' });
         setChainId(targetChainId);
         console.log('Connected to SEI:', targetChainId);
-      } catch (error: any) {
-        console.error('Failed to connect to SEI:', error);
-        setError(error?.message || 'Failed to connect to SEI');
+      } catch (error: unknown) {
+        let msg = 'Failed to connect to SEI';
+        if (typeof error === 'object' && error !== null && 'message' in error) {
+          msg = (error as { message?: string }).message || msg;
+        } else if (typeof error === 'string') {
+          msg = error;
+        }
+        setError(msg);
         throw error;
       }
       return;
@@ -229,9 +244,14 @@ export function useUnifiedWallet(): UnifiedWalletState {
       setChainId(newChainId);
       
       console.log('Switched to chain:', newChainId);
-    } catch (error: any) {
-      console.error('Failed to switch chain:', error);
-      setError(error?.message || 'Failed to switch chain');
+    } catch (error: unknown) {
+      let msg = 'Failed to switch chain';
+      if (typeof error === 'object' && error !== null && 'message' in error) {
+        msg = (error as { message?: string }).message || msg;
+      } else if (typeof error === 'string') {
+        msg = error;
+      }
+      setError(msg);
       throw error;
     }
   }, [type, connect]);

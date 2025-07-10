@@ -60,8 +60,14 @@ export default function TriggersPage() {
         { account: address }
       );
       toast.success('Trigger set! 🚦', { id: 'trigger' });
-    } catch (err: any) {
-      toast.error('Could not set trigger: ' + (err?.message || err), { id: 'trigger' });
+    } catch (err: unknown) {
+      let msg = 'Failed to fetch limit orders';
+      if (typeof err === 'object' && err !== null && 'message' in err) {
+        msg = (err as { message?: string }).message || msg;
+      } else if (typeof err === 'string') {
+        msg = err;
+      }
+      toast.error('Could not set trigger: ' + msg, { id: 'trigger' });
     } finally {
       setLoading(false);
     }
