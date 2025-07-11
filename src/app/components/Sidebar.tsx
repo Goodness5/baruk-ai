@@ -9,6 +9,7 @@ const nav = [
   { name: 'Lending', href: '/lending', icon: ClipboardDocumentListIcon },
   { name: 'Limit Orders', href: '/limit-orders', icon: ClipboardDocumentListIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+  { name: 'Scryer', href: '/scryer', icon: () => <span className="text-xl">🔮</span> },
 ];
 
 export default function Sidebar() {
@@ -18,7 +19,7 @@ export default function Sidebar() {
       <nav className="flex flex-col gap-2">
         {nav.map(({ name, href, icon: Icon }) => (
           <Link key={name} href={href} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gradient-to-r hover:from-purple-700 hover:to-green-500 transition-colors">
-            <Icon className="h-5 w-5" />
+            <span className="h-5 w-5 flex items-center justify-center"><Icon className="h-5 w-5" /></span>
             <span className="font-medium">{name}</span>
           </Link>
         ))}
