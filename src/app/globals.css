@@ -3,56 +3,65 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --neon-purple: #a855f7;
-  --neon-cyan: #22d3ee;
-  --neon-green: #22d37a;
-  --hud-glass: rgba(34, 211, 238, 0.08);
-  --hud-border: rgba(168, 85, 247, 0.5);
-  --hud-glow: 0 0 16px var(--neon-purple), 0 0 32px var(--neon-cyan);
-  --hud-radius: 24px;
-  --hud-blur: blur(12px);
-  --hud-shadow: 0 4px 32px 0 rgba(34, 211, 238, 0.12);
+  --background: #181c24;
+  --foreground: #f5f5f7;
+  --primary: #232946;
+  --surface: #232946;
+  --accent: #eebc5a;
+  --accent-foreground: #232946;
+  --muted: #6e6a86;
+  --teal: #2cb67d;
+  --coral: #ff6f61;
+  --purple: #7c3aed;
+  --border: #eebc5a;
+  --radius: 18px;
+  --shadow: 0 4px 24px 0 rgba(35, 41, 70, 0.12);
 }
 
 body {
-  background: linear-gradient(135deg, #0a0a0a 0%, #1e2e2e 100%);
+  background: var(--background);
   color: var(--foreground);
   font-family: 'Geist', Arial, Helvetica, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-.hud-glass {
-  background: var(--hud-glass);
-  border: 2px solid var(--hud-border);
-  border-radius: var(--hud-radius);
-  box-shadow: var(--hud-shadow);
-  backdrop-filter: var(--hud-blur);
-  animation: hudGlow 2.5s infinite alternate;
+.bg-primary {
+  background: var(--primary);
 }
-
-@keyframes hudGlow {
-  0% { box-shadow: 0 0 16px var(--neon-purple), 0 0 32px var(--neon-cyan); }
-  100% { box-shadow: 0 0 32px var(--neon-cyan), 0 0 64px var(--neon-purple); }
+.bg-surface {
+  background: var(--surface);
 }
-
-.neon-text {
-  color: var(--neon-cyan);
-  text-shadow: 0 0 8px var(--neon-cyan), 0 0 16px var(--neon-purple);
+.border-accent {
+  border-color: var(--accent);
 }
-
-.neon-border {
-  border: 2px solid var(--neon-purple);
-  box-shadow: 0 0 8px var(--neon-purple);
+.text-accent-foreground {
+  color: var(--accent-foreground);
+}
+.text-muted {
+  color: var(--muted);
+}
+.text-teal {
+  color: var(--teal);
+}
+.text-coral {
+  color: var(--coral);
+}
+.text-purple {
+  color: var(--purple);
+}
+.rounded-xl, .rounded-2xl {
+  border-radius: var(--radius);
+}
+.shadow-lg {
+  box-shadow: var(--shadow);
 }
 
 ::-webkit-scrollbar {
   width: 8px;
-  background: #1e2e2e;
+  background: var(--primary);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--neon-purple);
+  background: var(--accent);
   border-radius: 8px;
 }

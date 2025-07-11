@@ -17,7 +17,7 @@ interface AIState {
 
 const initialState: AIState = {
   chat: [
-    { role: 'ai', content: "Hi! I'm your AI Agent. Ask me anything or let me help you with DeFi magic!" }
+    { role: 'ai', content: "My name is Baruk and I'm here to help you. Ask me anything about DeFi, Sei, or your on-chain journey!" }
   ],
   input: '',
   pendingAction: undefined,

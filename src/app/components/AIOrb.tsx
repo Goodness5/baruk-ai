@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SparklesIcon, XMarkIcon, ArrowUpCircleIcon } from "@heroicons/react/24/solid";
+import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { useAI } from "./AIContext";
 
 const quickActions = [
@@ -15,6 +15,7 @@ const quickActions = [
 
 export default function AIOrb() {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { state, dispatch } = useAI();
   const inputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -29,17 +30,26 @@ export default function AIOrb() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [state.chat, open]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!state.input.trim()) return;
     dispatch({ type: "SEND_MESSAGE", message: { role: "user", content: state.input } });
-    // Simulate AI response (replace with real AI integration)
-    setTimeout(() => {
-      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: "I'm here to help! (AI integration coming soon)" } });
-    }, 600);
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: state.input }),
+      });
+      const data = await res.json();
+      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: data.message } });
+    } catch (e) {
+      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.' } });
+    }
+    setLoading(false);
   };
 
-  const handleInputKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") handleSend();
+  const handleInputKey = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") handleSend();
   };
 
   const handleQuickAction = (action: string, data?: unknown) => {
@@ -58,7 +68,7 @@ export default function AIOrb() {
     <>
       {/* Floating AI Orb Button */}
       <motion.button
-        className="fixed bottom-8 right-8 z-50 hud-glass neon-border w-20 h-20 flex items-center justify-center shadow-xl"
+        className="fixed bottom-8 right-8 z-50 rounded-full shadow-lg border-2 border-accent bg-primary text-accent-foreground w-20 h-20 flex items-center justify-center"
         animate={{ scale: [1, 1.08, 1], boxShadow: ["0 0 32px #22d3ee", "0 0 64px #a855f7", "0 0 32px #22d3ee"] }}
         transition={{ repeat: Infinity, duration: 3 }}
         onClick={() => setOpen(true)}
@@ -77,11 +87,11 @@ export default function AIOrb() {
             onClick={() => setOpen(false)}
           >
             <motion.div
-              className="hud-glass neon-border w-full max-w-md mx-auto p-6 rounded-2xl relative flex flex-col gap-4"
+              className="bg-surface border-2 border-accent w-full max-w-md mx-auto p-6 rounded-2xl relative flex flex-col gap-4"
               initial={{ y: 100, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 100, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
+              onClick={event => event.stopPropagation()}
             >
               <button className="absolute top-3 right-3" onClick={() => setOpen(false)} aria-label="Close">
                 <XMarkIcon className="w-6 h-6 text-white/80 hover:text-neon-cyan" />
@@ -104,15 +114,16 @@ export default function AIOrb() {
                   className="flex-1 p-3 rounded-lg bg-black/40 border border-neon-cyan text-white focus:outline-none focus:ring-2 focus:ring-neon-cyan"
                   placeholder="Type your question..."
                   value={state.input}
-                  onChange={e => dispatch({ type: "SET_INPUT", input: e.target.value })}
+                  onChange={event => dispatch({ type: "SET_INPUT", input: event.target.value })}
                   onKeyDown={handleInputKey}
                 />
                 <button
-                  className="p-2 rounded-lg bg-neon-cyan/80 hover:bg-neon-cyan neon-text flex items-center justify-center"
                   onClick={handleSend}
+                  className="p-2 rounded-lg bg-neon-cyan/80 hover:bg-neon-cyan neon-text flex items-center justify-center"
+                  disabled={loading}
                   aria-label="Send"
                 >
-                  <ArrowUpCircleIcon className="w-7 h-7" />
+                  {loading ? 'Sending...' : 'Send'}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2 mt-2">
