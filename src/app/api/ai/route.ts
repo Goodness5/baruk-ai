@@ -1,27 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { messages } = await req.json();
-  const apiKey = process.env.FIREWORKS_KEY;
-  const model = 'accounts/secdad1-dce50d/deployedModels/neo-v1-dgemdq13';
+  const { prompt } = await req.json();
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'Missing OpenAI API key' }, { status: 500 });
+  }
 
-  const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
+  const systemPrompt = `You are Baruk, a friendly, helpful, and slightly witty AI agent for a DeFi app on Sei. Always introduce yourself as 'My name is Baruk and I'm here to help you.' Answer questions about DeFi, Sei, wallets, coins, NFTs, and on-chain activity. Be concise, clear, and approachable.`;
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
+      'Authorization': `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
-      messages,
-      stream: false
-    })
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      max_tokens: 256,
+      temperature: 0.7,
+    }),
   });
 
-  if (!response.ok) {
-    return NextResponse.json({ error: 'AI request failed' }, { status: 500 });
+  if (!res.ok) {
+    return NextResponse.json({ error: 'OpenAI API error' }, { status: 500 });
   }
 
-  const data = await response.json();
-  return NextResponse.json(data);
+  const data = await res.json();
+  const aiMessage = data.choices?.[0]?.message?.content || 'Sorry, I could not generate a response.';
+  return NextResponse.json({ message: aiMessage });
 }
