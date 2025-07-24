@@ -3,6 +3,12 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { useAI } from "./AIContext";
+import { useAccount } from "wagmi";
+// Utility to strip inline styles from agent HTML
+function stripAgentStyles(html: string) {
+  // Remove all style="..." attributes
+  return html.replace(/ style="[^"]*"/g, "");
+}
 
 const quickActions = [
   { label: "Go to Trade", action: "navigate", data: { page: "/swap" } },
@@ -19,6 +25,7 @@ export default function AIOrb() {
   const { state, dispatch } = useAI();
   const inputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { address, isConnected } = useAccount();
 
   useEffect(() => {
     if (open) {
@@ -32,18 +39,28 @@ export default function AIOrb() {
 
   const handleSend = async () => {
     if (!state.input.trim()) return;
-    dispatch({ type: "SEND_MESSAGE", message: { role: "user", content: state.input } });
+    dispatch({ type: "SEND_MESSAGE", message: { role: "user", content: state.input, timestamp: Date.now() } });
     setLoading(true);
     try {
-      const res = await fetch('/api/ai', {
+      const res = await fetch('/api/baruk-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: state.input }),
+        body: JSON.stringify({ 
+          message: state.input, 
+          userId: address || 'anonymous',
+          walletAddress: address,
+          sessionId: Date.now().toString()
+        }),
       });
       const data = await res.json();
-      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: data.message } });
+      // Always use data.text for the agent's answer
+      if (data.text) {
+        dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: data.text, timestamp: Date.now() } });
+      } else {
+        dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.', timestamp: Date.now() } });
+      }
     } catch (e) {
-      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.' } });
+      dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.', timestamp: Date.now() } });
     }
     setLoading(false);
   };
@@ -103,7 +120,14 @@ export default function AIOrb() {
               <div className="flex-1 min-h-[200px] max-h-72 overflow-y-auto bg-transparent rounded-lg p-2">
                 {state.chat.map((msg, i) => (
                   <div key={i} className={`mb-2 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`px-4 py-2 rounded-xl text-sm max-w-[80%] ${msg.role === 'user' ? 'bg-neon-cyan/20 text-neon-cyan' : 'bg-black/40 neon-text'}`}>{msg.content}</div>
+                    {msg.role === 'ai' ? (
+                      <div
+                        className="px-4 py-3 rounded-2xl text-base max-w-[90%] bg-gradient-to-br from-black/70 via-black/80 to-black/90 border border-neon-cyan shadow-lg text-white"
+                        dangerouslySetInnerHTML={{ __html: stripAgentStyles(msg.content) }}
+                      />
+                    ) : (
+                      <div className="px-4 py-2 rounded-xl text-sm max-w-[80%] bg-neon-cyan/20 text-neon-cyan">{msg.content}</div>
+                    )}
                   </div>
                 ))}
                 <div ref={chatEndRef} />

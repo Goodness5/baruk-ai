@@ -1,5 +1,6 @@
 "use client";
 
+import { timeStamp } from 'console';
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 
 export type AIMessage = {
@@ -7,17 +8,60 @@ export type AIMessage = {
   content: string;
   action?: string;
   data?: unknown;
+  timestamp: number;
+  context?: {
+    marketState?: 'bull' | 'bear' | 'neutral';
+    riskProfile?: 'conservative' | 'moderate' | 'aggressive';
+    relevantMetrics?: {
+      [key: string]: number;
+    };
+    suggestedActions?: Array<{
+      type: string;
+      description: string;
+      priority: number;
+    }>;
+  };
 };
 
 interface AIState {
   chat: AIMessage[];
   input: string;
   pendingAction?: { action: string; data?: unknown };
+  marketContext?: {
+    lastUpdate: number;
+    prices: Record<string, number>;
+    trends: Record<string, 'up' | 'down' | 'stable'>;
+    opportunities: Array<{
+      type: string;
+      description: string;
+      score: number;
+    }>;
+  };
+  userContext?: {
+    riskProfile: {
+      score: number;
+      category: 'conservative' | 'moderate' | 'aggressive';
+    };
+    portfolio: {
+      totalValue: number;
+      changes24h: number;
+      topPositions: Array<{
+        type: string;
+        value: number;
+        change: number;
+      }>;
+    };
+  };
 }
 
 const initialState: AIState = {
   chat: [
-    { role: 'ai', content: "My name is Baruk and I'm here to help you. Ask me anything about DeFi, Sei, or your on-chain journey!" }
+    
+    {
+      role: 'ai',
+      content: 'I can assist with DeFi strategies, Sei blockchain insights, and personalized portfolio management.',
+      timestamp: Date.now(),
+    },
   ],
   input: '',
   pendingAction: undefined,

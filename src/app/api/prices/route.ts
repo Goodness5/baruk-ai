@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/token_price/ethereum';
+const COINGECKO_URL = 'https://api.coingecko.com/api/v3/simple/price';
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || '';
 
 async function fetchSyvePrices(addresses: string[]): Promise<Record<string, number>> {
   if (addresses.length === 0) return {};
@@ -31,21 +32,27 @@ async function fetchSyvePrices(addresses: string[]): Promise<Record<string, numb
 }
 
 async function fetchCoinGeckoPrices(addresses: string[]): Promise<Record<string, number>> {
-  if (addresses.length === 0) return {};
   const params = new URLSearchParams({
-    contract_addresses: addresses.join(','),
+    ids: addresses.join(','),
     vs_currencies: 'usd'
   });
-  const res = await fetch(`${COINGECKO_URL}?${params.toString()}`);
-  if (!res.ok) return {};
-  const data = await res.json();
-  const prices: Record<string, number> = {};
-  for (const [address, obj] of Object.entries(data)) {
-    if (obj && typeof obj === 'object' && 'usd' in obj) {
-      prices[address.toLowerCase()] = Number(obj.usd);
+  try {
+    const res = await fetch(`${COINGECKO_URL}?${params.toString()}`, {
+      headers: {
+        'x-cg-pro-api-key': COINGECKO_API_KEY
+      }
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    const prices: Record<string, number> = {};
+    for (const id of addresses) {
+      if (data[id] && data[id].usd) prices[id] = data[id].usd;
     }
+    return prices;
+  } catch (e) {
+    console.error('CoinGecko fetch failed:', e);
+    return {};
   }
-  return prices;
 }
 
 export async function POST(req: NextRequest) {

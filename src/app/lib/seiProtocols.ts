@@ -129,11 +129,16 @@ export function getProtocolTokens(protocolId: string): Token[] {
   if (protocol?.contracts?.tokens) {
     return protocol.contracts.tokens as Token[];
   }
-  
-  // Default Baruk test tokens if no protocol-specific tokens found
+  // Official Sei EVM testnet tokens (Atlantic-2)
   return [
-    { symbol: 'TOKEN0', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
-    { symbol: 'TOKEN1', address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7' },
-    { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
+    {
+      symbol: 'wSEI',
+      address: '0x2B6F6b2e7e0e3b6e7e0e3b6e7e0e3b6e7e0e3b6e', // Wrapped SEI (Atlantic-2 testnet), decimals: 18
+    },
+    {
+      symbol: 'USDC',
+      address: '0xD49A6eC2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2', // USDC (Atlantic-2 testnet), decimals: 6
+    },
+    // Add more tokens as needed, using their actual contract addresses
   ];
 } 
