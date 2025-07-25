@@ -1,78 +1,35 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ethers } from 'ethers';
 import { BARUK_CONTRACTS, SEI_DEXS } from './types';
 import { getProtocolTokens } from './seiProtocols';
 import { getTokenBalance } from './mcpTools';
 import axios from 'axios';
+import ROUTER_ABI from '../../abi/BarukRouter.json';
+import AMM_ABI from '../../abi/BarukAMM.json';
+import YIELD_FARM_ABI from '../../abi/BarukYieldFarm.json';
+import LENDING_ABI from '../../abi/BarukLending.json';
+import LIMIT_ORDER_ABI from '../../abi/BarukLimitOrder.json';
+import FACTORY_AMM from '../../abi/BarukAMMFactory.json';
+import ERC20_ABI from '../../abi/ERC20.json';
 
 const SEI_RPC_URL = process.env.SEI_RPC_URL || 'https://evm-rpc.sei-apis.com';
 const provider = new ethers.JsonRpcProvider(SEI_RPC_URL);
 
 const COVALENT_API_KEY = process.env.COVALENT_API_KEY;
-const SEI_CHAIN_ID = Number(process.env.SEI_CHAIN_ID) || 1328; // Default to testnet
+const SEI_CHAIN_ID = Number(process.env.SEI_CHAIN_ID) || 1328;
 
-// Contract ABIs
-const ROUTER_ABI = [
-  'function addLiquidity(address tokenA, address tokenB, uint amountADesired, uint amountBDesired, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB, uint liquidity)',
-  'function removeLiquidity(address tokenA, address tokenB, uint liquidity, uint amountAMin, uint amountBMin, address to, uint deadline) external returns (uint amountA, uint amountB)',
-  'function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function swapTokensForExactTokens(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)',
-  'function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)',
-  'function getAmountsIn(uint amountOut, address[] calldata path) external view returns (uint[] memory amounts)',
-  'function quote(uint amountA, uint reserveA, uint reserveB) external pure returns (uint amountB)',
-];
-
-const AMM_ABI = [
-  'function getReserves(address tokenA, address tokenB) external view returns (uint112 reserveA, uint112 reserveB, uint32 blockTimestampLast)',
-  'function getPair(address tokenA, address tokenB) external view returns (address pair)',
-  'function totalSupply() external view returns (uint256)',
-  'function balanceOf(address account) external view returns (uint256)',
-];
-
-const YIELD_FARM_ABI = [
-  'function poolInfo(uint256 poolId) external view returns (address lpToken, address rewardToken, uint256 rewardPerSecond, uint256 lastUpdateTime, uint256 totalStaked)',
-  'function userInfo(uint256 poolId, address user) external view returns (uint256 amount, uint256 rewardDebt)',
-  'function pendingReward(uint256 poolId, address user) external view returns (uint256)',
-  'function stake(uint256 poolId, uint256 amount) external',
-  'function unstake(uint256 poolId, uint256 amount) external',
-  'function claimReward(uint256 poolId) external',
-  'function emergencyWithdraw(uint256 poolId) external',
-];
-
-const LENDING_ABI = [
-  'function depositAndBorrow(address collateralToken, uint256 collateralAmount, address borrowToken, uint256 borrowAmount) external',
-  'function repay(address token, uint256 amount) external',
-  'function liquidate(address user, address collateralToken, address borrowToken) external',
-  'function getUserPosition(address user) external view returns (address[] memory collateralTokens, uint256[] memory collateralAmounts, address[] memory borrowTokens, uint256[] memory borrowAmounts)',
-  'function getHealthFactor(address user) external view returns (uint256)',
-  'function getTokenTwap(address token) external view returns (uint256)',
-];
-
-const LIMIT_ORDER_ABI = [
-  'function placeOrder(address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, uint256 deadline) external returns (uint256 orderId)',
-  'function cancelOrder(uint256 orderId) external',
-  'function executeOrder(uint256 orderId, uint256 minAmountOut) external',
-  'function getOrder(uint256 orderId) external view returns (address user, address tokenIn, address tokenOut, uint256 amountIn, uint256 minAmountOut, uint256 deadline, bool executed)',
-  'function getUserOrders(address user) external view returns (uint256[] memory)',
-];
 
 const ORACLE_ABI = [
   'function getExchangeRate(string memory denom) external view returns (uint256)',
   'function getExchangeRates() external view returns (string[] memory, uint256[] memory)',
 ];
 
-const ERC20_ABI = [
-  'function balanceOf(address owner) view returns (uint256)',
-  'function transfer(address to, uint amount) returns (bool)',
-  'function approve(address spender, uint amount) returns (bool)',
-  'function allowance(address owner, address spender) view returns (uint256)',
-  'function name() view returns (string)',
-  'function symbol() view returns (string)',
-  'function decimals() view returns (uint8)',
-];
-
 // Helper function to get contract instance
-function getContract(address: string, abi: any[]) {
-  return new ethers.Contract(address, abi, provider);
+function getContract(address: string, abi: any) {
+  const contract = new ethers.Contract(address, abi, provider);
+  console.log("prepare contract:::", contract)
+  return contract;
 }
 
 // Baruk Protocol Tools
@@ -132,19 +89,58 @@ export async function addLiquidity(params: {
   }
 }
 
-export async function swapTokens(params: any): Promise<string> {
+export async function swapTokens(params: {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string; // Can be exact amount or percentage string like "50%"
+  minAmountOut: string;
+  to: string;
+  deadline: number;
+  signer: ethers.Signer; // Add signer parameter
+  userAddress: string; // Add user address for balance checks
+}): Promise<string> {
   try {
-    const router = getContract(BARUK_CONTRACTS.Router, ROUTER_ABI);
-    const path = [params.tokenIn, params.tokenOut];
-    
-    const tx = await router.swapExactTokensForTokens(
-      params.amountIn,
+    // Parameter validation
+    const required = [
+      'tokenIn', 'tokenOut', 'amountIn', 'minAmountOut', 'to', 'deadline', 'signer', 'userAddress'
+    ];
+    for (const key of required) {
+      if (!(key in params) || params[key] === undefined || params[key] === null) {
+        throw new Error(`swapTokens: Missing required parameter: ${key}`);
+      }
+    }
+
+    // Get token contracts with signer
+    const tokenInContract = new ethers.Contract(params.tokenIn, ERC20_ABI, params.signer);
+    const router = new ethers.Contract(BARUK_CONTRACTS.Router, ROUTER_ABI.abi, params.signer);
+
+    // Handle percentage amounts (e.g. "50%")
+    let swapAmount: string = params.amountIn;
+    if (typeof params.amountIn === 'string' && params.amountIn.includes('%')) {
+      const percent = parseFloat(params.amountIn.replace('%', '')) / 100;
+      const balance = await tokenInContract.balanceOf(params.userAddress);
+      const decimals = await tokenInContract.decimals();
+      const amount = percent * Number(ethers.formatUnits(balance, decimals));
+      swapAmount = ethers.parseUnits(amount.toString(), decimals).toString();
+    }
+
+    // Check and approve token spending if needed
+    const allowance = await tokenInContract.allowance(params.userAddress, BARUK_CONTRACTS.Router);
+    if (BigInt(allowance.toString()) < BigInt(swapAmount)) {
+      const approveTx = await tokenInContract.approve(BARUK_CONTRACTS.Router, ethers.MaxUint256);
+      await approveTx.wait();
+    }
+
+    // Execute swap using the correct ABI and method signature
+    const tx = await router.swap(
+      params.tokenIn,
+      params.tokenOut,
+      swapAmount,
       params.minAmountOut,
-      path,
-      params.to,
-      params.deadline
+      params.deadline,
+      params.to
     );
-    
+    await tx.wait();
     return tx.hash;
   } catch (error) {
     throw new Error(`Failed to swap tokens: ${error}`);
@@ -153,7 +149,12 @@ export async function swapTokens(params: any): Promise<string> {
 
 export async function getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string): Promise<string[]> {
   try {
-    const router = getContract(BARUK_CONTRACTS.Router, ROUTER_ABI);
+    // Parameter validation
+    if (!tokenIn || !tokenOut || !amountIn) {
+      throw new Error('getSwapQuote: tokenIn, tokenOut, and amountIn are required');
+    }
+    // Use correct ABI array
+    const router = getContract(BARUK_CONTRACTS.Router, ROUTER_ABI.abi);
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
     return amounts.map((amt: any) => amt.toString());
@@ -392,24 +393,29 @@ export async function findBestPrice(tokenIn: string, tokenOut: string, amountIn:
   route: string[];
 }> {
   try {
+    // Parameter validation
+    if (!tokenIn || !tokenOut || !amountIn) {
+      throw new Error('findBestPrice: tokenIn, tokenOut, and amountIn are required');
+    }
     const dexes = [
       { name: 'Baruk', router: BARUK_CONTRACTS.Router },
       // Add other DEXs when addresses are available
       // { name: 'Dragonswap', router: SEI_DEXS.DRAGONSWAP_ROUTER },
       // { name: 'Astroport', router: SEI_DEXS.ASTROPORT_ROUTER },
     ];
-    
+
     let bestPrice = "0";
     let bestDex = "";
     let route: string[] = [];
-    
+
     for (const dex of dexes) {
       try {
-        const router = getContract(dex.router, ROUTER_ABI);
+        // Use correct ABI array
+        const router = getContract(dex.router, ROUTER_ABI.abi);
         const path = [tokenIn, tokenOut];
         const amounts = await router.getAmountsOut(amountIn, path);
         const outputAmount = amounts[amounts.length - 1].toString();
-        
+
         if (Number(outputAmount) > Number(bestPrice)) {
           bestPrice = outputAmount;
           bestDex = dex.name;
@@ -420,13 +426,14 @@ export async function findBestPrice(tokenIn: string, tokenOut: string, amountIn:
         continue;
       }
     }
-    
+
     return { bestDex, bestPrice, route };
   } catch (error) {
     throw new Error(`Failed to find best price: ${error}`);
   }
 }
 
+// ...existing code...
 export async function executeArbitrage(params: {
   tokenA: string;
   tokenB: string;
@@ -651,6 +658,7 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
         type: item.type,
         quote: item.quote,
       }));
+    // ...existing code...
     } catch (e: any) {
       logError('getWalletTokenHoldings', e);
       return [{ error: 'Failed to fetch token balances from Covalent. This may be due to network issues, Covalent downtime, or firewall restrictions. Please check your connection and try again.', details: e?.message || e }];
@@ -662,6 +670,7 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
     let nativeBalance = '0';
     try {
       nativeBalance = (await provider.getBalance(walletAddress)).toString();
+    // ...existing code...
     } catch (e) {
       nativeBalance = '0';
     }
@@ -689,16 +698,37 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
             type: 'erc20',
           };
         } catch (e) {
-          return null;
+          return e; // Return null on error
         }
       })
     );
-    return holdings.concat(erc20s.filter((t): t is NonNullable<typeof t> => Boolean(t)));
+    // Only include valid token objects
+    return holdings.concat(
+      erc20s.filter(
+        (t): t is {
+          contract_address: string;
+          symbol: string;
+          name: string;
+          balance: string;
+          decimals: number;
+          type: string;
+        } =>
+          t !== null &&
+          typeof t === 'object' &&
+          'contract_address' in t &&
+          'symbol' in t &&
+          'name' in t &&
+          'balance' in t &&
+          'decimals' in t &&
+          'type' in t
+      )
+    );
   } else {
     return [{ error: 'Unsupported SEI_CHAIN_ID. Please set SEI_CHAIN_ID to 1329 (mainnet) or 1328 (testnet).' }];
   }
 }
 
+// ...existing code...
 export async function analyzeFullPortfolio(walletAddress: string): Promise<any> {
   const tokens = await getWalletTokenHoldings(walletAddress);
   if (!Array.isArray(tokens) || tokens.length === 0 || tokens[0]?.error) {
@@ -725,3 +755,438 @@ export async function analyzeFullPortfolio(walletAddress: string): Promise<any> 
     tokens,
   };
 } 
+
+// Price Oracle Tools
+export async function getTokenInfo(tokenAddress: string): Promise<{
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  priceUSD?: number;
+  totalSupply?: string;
+}> {
+  try {
+    const token = getContract(tokenAddress, ERC20_ABI);
+    const [symbol, name, decimals, totalSupply] = await Promise.all([
+      token.symbol(),
+      token.name(),
+      token.decimals(),
+      token.totalSupply?.().catch(() => '0') // Optional as not all tokens have totalSupply
+    ]);
+
+    let priceUSD;
+    try {
+      priceUSD = await getTokenPrice(tokenAddress);
+    } catch {
+      priceUSD = undefined;
+    }
+
+    return {
+      address: tokenAddress,
+      symbol,
+      name,
+      decimals: Number(decimals),
+      priceUSD: priceUSD ? Number(priceUSD) : undefined,
+      totalSupply: totalSupply?.toString()
+    };
+  } catch (error) {
+    throw new Error(`Failed to get token info: ${error}`);
+  }
+}
+
+// Gas Estimation Tools
+export async function estimateGasCost(txData: {
+  to: string;
+  data: string;
+  value?: string;
+}): Promise<{
+  gasEstimate: string;
+  gasPrice: string;
+  costNative: string;
+  costUSD?: string;
+}> {
+  try {
+    const [gasEstimate, gasPrice] = await Promise.all([
+      provider.estimateGas(txData),
+      // provider.getGasPrice(),
+      getTokenPrice(BARUK_CONTRACTS.nativeToken) // Assuming you have a native token address
+    ]);
+
+    const costNative = (gasEstimate).toString();
+    let costUSD;
+    
+    // if (nativePrice) {
+    //   costUSD = (Number(costNative) * Number(nativePrice) / 1e18).toFixed(2);
+    // }
+
+    return {
+      gasEstimate: gasEstimate.toString(),
+      gasPrice: gasPrice.toString(),
+      costNative,
+      costUSD
+    };
+  } catch (error) {
+    throw new Error(`Failed to estimate gas cost: ${error}`);
+  }
+}
+
+// Transaction Simulation Tool
+export async function simulateTransaction(params: {
+  from: string;
+  to: string;
+  data: string;
+  value?: string;
+}): Promise<{
+  success: boolean;
+  gasUsed: string;
+  changes: Array<{
+    address: string;
+    balanceChange: string;
+  }>;
+  error?: string;
+}> {
+  try {
+    // This would use Tenderly or another simulation service in production
+    // For now, we'll simulate locally
+    const result = await provider.call({
+      from: params.from,
+      to: params.to,
+      data: params.data,
+      value: params.value || '0'
+    });
+
+    // Parse the result - this is simplified
+    return {
+      success: true,
+      gasUsed: '0', // Would need proper simulation to get this
+      changes: []   // Would need proper simulation to get this
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      gasUsed: '0',
+      changes: [],
+      error: error.reason || error.message
+    };
+  }
+}
+
+// Position Management Tools
+export async function getOptimalRepayAmount(user: string, token: string): Promise<string> {
+  try {
+    const lending = getContract(BARUK_CONTRACTS.Lending, LENDING_ABI);
+    const position = await lending.getUserPosition(user);
+    
+    for (let i = 0; i < position.borrowTokens.length; i++) {
+      if (position.borrowTokens[i] === token) {
+        return position.borrowAmounts[i].toString();
+      }
+    }
+    
+    return '0';
+  } catch (error) {
+    throw new Error(`Failed to get optimal repay amount: ${error}`);
+  }
+}
+
+export async function getHealthFactor(user: string): Promise<string> {
+  try {
+    const lending = getContract(BARUK_CONTRACTS.Lending, LENDING_ABI);
+    const healthFactor = await lending.getHealthFactor(user);
+    return healthFactor.toString();
+  } catch (error) {
+    throw new Error(`Failed to get health factor: ${error}`);
+  }
+}
+
+// Yield Optimization Tools
+export async function calculateAutoCompound(poolId: number, user: string): Promise<{
+  optimalInterval: number; // in seconds
+  estimatedAPYBoost: string; // percentage
+  gasCost: string;
+}> {
+  try {
+    const farm = getContract(BARUK_CONTRACTS.YieldFarm, YIELD_FARM_ABI);
+    const [pendingRewards, userInfo] = await Promise.all([
+      farm.pendingReward(poolId, user),
+      farm.userInfo(poolId, user)
+    ]);
+
+    // Simplified calculation - real implementation would be more complex
+    const stakedAmount = Number(userInfo.amount);
+    const pendingAmount = Number(pendingRewards);
+    
+    if (stakedAmount === 0) {
+      return {
+        optimalInterval: 0,
+        estimatedAPYBoost: '0',
+        gasCost: '0'
+      };
+    }
+
+    const rewardRate = pendingAmount / (24 * 3600); // Assume daily rewards
+    const optimalInterval = Math.max(3600, Math.min(24 * 3600, (stakedAmount / rewardRate) * 0.5));
+    
+    return {
+      optimalInterval,
+      estimatedAPYBoost: (pendingAmount / stakedAmount * 100).toFixed(2),
+      gasCost: await estimateGasCost({
+        to: BARUK_CONTRACTS.YieldFarm,
+        data: farm.interface.encodeFunctionData('claimReward', [poolId])
+      }).then(res => res.costNative)
+    };
+  } catch (error) {
+    throw new Error(`Failed to calculate auto-compound: ${error}`);
+  }
+}
+
+// Risk Management Tools
+export async function checkLiquidationRisk(user: string): Promise<{
+  atRisk: boolean;
+  healthFactor: string;
+  mostVulnerablePosition?: {
+    collateralToken: string;
+    borrowToken: string;
+    collateralNeeded: string;
+  };
+}> {
+  try {
+    const lending = getContract(BARUK_CONTRACTS.Lending, LENDING_ABI);
+    const healthFactor = await lending.getHealthFactor(user);
+    
+    if (Number(healthFactor) > 1.5) {
+      return {
+        atRisk: false,
+        healthFactor: healthFactor.toString()
+      };
+    }
+
+    // Get the most vulnerable position
+    const position = await lending.getUserPosition(user);
+    let mostVulnerable;
+    let minRatio = Infinity;
+    
+    for (let i = 0; i < position.collateralTokens.length; i++) {
+      const ratio = Number(position.collateralAmounts[i]) / Number(position.borrowAmounts[i] || 1);
+      if (ratio < minRatio) {
+        minRatio = ratio;
+        mostVulnerable = {
+          collateralToken: position.collateralTokens[i],
+          borrowToken: position.borrowTokens[i],
+          collateralNeeded: (Number(position.borrowAmounts[i]) * 1.1 - Number(position.collateralAmounts[i])).toString()
+        };
+      }
+    }
+
+    return {
+      atRisk: true,
+      healthFactor: healthFactor.toString(),
+      mostVulnerablePosition: mostVulnerable
+    };
+  } catch (error) {
+    throw new Error(`Failed to check liquidation risk: ${error}`);
+  }
+}
+
+// Wallet Management Tools
+export async function validateWalletAddress(address: string): Promise<{
+  isValid: boolean;
+  isContract: boolean;
+  ensName?: string;
+}> {
+  try {
+    const checksum = ethers.getAddress(address); // Throws if invalid
+    const code = await provider.getCode(checksum);
+    
+    return {
+      isValid: true,
+      isContract: code !== '0x',
+      ensName: undefined // ENS not supported on Sei, but keeping for compatibility
+    };
+  } catch {
+    return {
+      isValid: false,
+      isContract: false
+    };
+  }
+}
+
+export async function getTransactionHistory(address: string, limit = 10): Promise<Array<{
+  hash: string;
+  timestamp: number;
+  to: string;
+  from: string;
+  value: string;
+  method?: string;
+}>> {
+  try {
+    if (SEI_CHAIN_ID === 1329 && COVALENT_API_KEY) {
+      const url = `https://api.covalenthq.com/v1/${SEI_CHAIN_ID}/address/${address}/transactions_v2/?key=${COVALENT_API_KEY}&page-size=${limit}`;
+      const { data } = await covalentGetWithRetry(url);
+      
+      return data.data.items.map((tx: any) => ({
+        hash: tx.tx_hash,
+        timestamp: new Date(tx.block_signed_at).getTime() / 1000,
+        to: tx.to_address,
+        from: tx.from_address,
+        value: tx.value,
+        method: tx.log_events[0]?.decoded?.name
+      }));
+    }
+
+    // Fallback for testnet or when Covalent not available
+    const blockNumber = await provider.getBlockNumber();
+    const txs = [];
+    
+    // This is very simplified - in production you'd want to index transactions
+    for (let i = blockNumber; i > blockNumber - 1000 && txs.length < limit; i--) {
+      const block = await provider.getBlock(i, true);
+      if (block?.transactions) {
+        for (const txHash of block.transactions) {
+          const tx = await provider.getTransaction(txHash);
+          if (tx?.from === address || tx?.to === address) {
+            txs.push({
+              hash: tx?.hash,
+              timestamp: block.timestamp,
+              to: tx?.to || '',
+              from: tx?.from,
+              value: tx?.value.toString()
+            });
+          }
+        }
+      }
+    }
+    
+    return txs.slice(0, limit);
+  } catch (error) {
+    throw new Error(`Failed to get transaction history: ${error}`);
+  }
+}
+
+// Cross-Chain Tools (placeholder implementations)
+export async function getBridgeOptions(tokenAddress: string): Promise<Array<{
+  bridgeName: string;
+  estimatedTime: string;
+  fee: string;
+  supportedChains: number[];
+}>> {
+  // In a real implementation, this would query various bridge APIs
+  return [
+    {
+      bridgeName: "Baruk Bridge",
+      estimatedTime: "5 minutes",
+      fee: "0.1%",
+      supportedChains: [1, 56, 137, 1329] // ETH, BSC, Polygon, Sei
+    },
+    {
+      bridgeName: "Axelar",
+      estimatedTime: "15 minutes",
+      fee: "0.3% + gas",
+      supportedChains: [1, 56, 137, 42161, 1329]
+    }
+  ];
+}
+
+export async function estimateBridgeGas(
+  sourceChain: number,
+  destChain: number,
+  tokenAddress: string,
+  amount: string
+): Promise<{
+  sourceGas: string;
+  destGas: string;
+  bridgeFee: string;
+  totalCostUSD?: string;
+}> {
+  // Placeholder implementation
+  return {
+    sourceGas: "0.01",
+    destGas: "0.005",
+    bridgeFee: "0.001",
+    totalCostUSD: "10.50"
+  };
+}
+
+// Advanced Analytics Tools
+export async function calculateImpermanentLoss(
+  tokenA: string,
+  tokenB: string,
+  entryPriceRatio: string,
+  currentPriceRatio: string
+): Promise<string> {
+  // Implementation of impermanent loss formula
+  const entry = Number(entryPriceRatio);
+  const current = Number(currentPriceRatio);
+  const priceRatio = current / entry;
+  const il = 2 * Math.sqrt(priceRatio) / (1 + priceRatio) - 1;
+  return (il * 100).toFixed(2);
+}
+
+export async function getHistoricalAPY(poolId: number, days = 30): Promise<Array<{
+  date: string;
+  apy: string;
+  tvl: string;
+}>> {
+  // Placeholder implementation - would query historical data in production
+  const results = [];
+  for (let i = 0; i < days; i++) {
+    results.push({
+      date: new Date(Date.now() - (days - i) * 24 * 3600 * 1000).toISOString().split('T')[0],
+      apy: (Math.random() * 20 + 5).toFixed(2),
+      tvl: (Math.random() * 1000000 + 500000).toFixed(2)
+    });
+  }
+  return results;
+}
+
+// Utility Tools
+export async function decodeTransactionData(txData: string): Promise<{
+  method: string | undefined;
+  params: Record<string, any> | undefined;
+}> {
+  try {
+    // Try all known ABIs
+    const abis = [ROUTER_ABI, AMM_ABI, YIELD_FARM_ABI, LENDING_ABI, LIMIT_ORDER_ABI];
+    
+    for (const abi of abis) {
+      try {
+        const iface = new ethers.Interface(abi);
+        const decoded = iface.parseTransaction({ data: txData });
+        return {
+          method: decoded?.name,
+          params: decoded?.args
+        };
+      } catch {
+        continue;
+      }
+    }
+    
+    throw new Error("Could not decode transaction data with known ABIs");
+  } catch (error) {
+    throw new Error(`Failed to decode transaction data: ${error}`);
+  }
+}
+
+export async function encodeFunctionCall(params: {
+  contractAddress: string;
+  functionName: string;
+  args: any[];
+}): Promise<string> {
+  try {
+    // Try all known ABIs
+    const abis = [ROUTER_ABI, AMM_ABI, YIELD_FARM_ABI, LENDING_ABI, LIMIT_ORDER_ABI];
+    
+    for (const abi of abis) {
+      try {
+        const iface = new ethers.Interface(abi);
+        return iface.encodeFunctionData(params.functionName, params.args);
+      } catch {
+        continue;
+      }
+    }
+    
+    throw new Error("Could not encode function call with known ABIs");
+  } catch (error) {
+    throw new Error(`Failed to encode function call: ${error}`);
+  }
+}

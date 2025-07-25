@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export interface WalletBalance {
   address: string;
   balance: string;
@@ -95,6 +96,7 @@ export interface BarukContracts {
   Lending: string;
   LimitOrder: string;
   Oracle: string;
+  nativeToken: string;
   Factory: string;
 }
 
@@ -158,6 +160,7 @@ export const BARUK_CONTRACTS: BarukContracts = {
   Lending: "0x5197d95B4336f1EF6dd0fd62180101021A88E27b",
   LimitOrder: "0x3bDdc3fAbf58fDaA6fF62c95b944819cF625c0F4",
   Oracle: "0x0000000000000000000000000000000000001008",
+  nativeToken: "0x000000000000000000000000000000000000000000",
   Factory: "0xCEeC70dF7bC3aEB57F078A1b1BeEa2c6320d8957",
 };
 
