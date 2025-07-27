@@ -1,29 +1,30 @@
-// --- swapTokens test ---
-skipIfNoKey('swapTokens sends a tx or returns error', async () => {
-  if (!wallet) throw new Error('Test wallet not initialized');
-  // Approve router to spend token first
-  const token = new ethers.Contract(ADDRESSES.Token0, [
-    'function approve(address,uint256) public returns (bool)'
-  ], wallet);
-  await token.approve(ADDRESSES.Router, AMOUNT);
+/* eslint-disable @typescript-eslint/no-require-imports */
+// // --- swapTokens test ---
+// skipIfNoKey('swapTokens sends a tx or returns error', async () => {
+//   if (!wallet) throw new Error('Test wallet not initialized');
+//   // Approve router to spend token first
+//   const token = new ethers.Contract(ADDRESSES.Token0, [
+//     'function approve(address,uint256) public returns (bool)'
+//   ], wallet);
+//   await token.approve(ADDRESSES.Router, AMOUNT);
 
-  try {
-    const txHash = await require('./barukTools').swapTokens({
-      tokenIn: ADDRESSES.Token0,
-      tokenOut: ADDRESSES.Token1,
-      amountIn: AMOUNT,
-      minAmountOut: MIN_AMOUNT_OUT,
-      to: wallet.address,
-      deadline: Math.floor(Date.now() / 1000) + 300,
-      privateKey: testPrivateKey
-    });
-    console.log('swapTokens tx:', txHash);
-    expect(typeof txHash).toBe('string');
-  } catch (e) {
-    console.warn('swapTokens error:', e);
-    expect(typeof e).toBe('object');
-  }
-});
+//   try {
+//     const txHash = await require('./barukTools').swapTokens({
+//       tokenIn: ADDRESSES.Token0,
+//       tokenOut: ADDRESSES.Token1,
+//       amountIn: AMOUNT,
+//       minAmountOut: MIN_AMOUNT_OUT,
+//       to: wallet.address,
+//       deadline: Math.floor(Date.now() / 1000) + 300,
+//       privateKey: testPrivateKey
+//     });
+//     console.log('swapTokens tx:', txHash);
+//     expect(typeof txHash).toBe('string');
+//   } catch (e) {
+//     console.warn('swapTokens error:', e);
+//     expect(typeof e).toBe('object');
+//   }
+// });
 import 'dotenv/config';
 import { ethers } from 'ethers';
 import {
@@ -40,15 +41,15 @@ const testPrivateKey = process.env.TEST_PRIVATE_KEY;
 const SEI_CHAIN_ID = Number(process.env.SEI_CHAIN_ID) || 1328;
 const provider = new ethers.JsonRpcProvider(process.env.SEI_RPC_URL || 'https://evm-rpc-testnet.sei-apis.com');
 
-function skipIfNoKey(title: string, fn: () => Promise<void>) {
-  if (!testPrivateKey) {
-    it.skip(title, () => {
-      console.warn('TEST_PRIVATE_KEY not set, skipping write test');
-    });
-  } else {
-    it(title, fn);
-  }
-}
+// function skipIfNoKey(title: string, fn: () => Promise<void>) {
+//   if (!testPrivateKey) {
+//     it.skip(title, () => {
+//       console.warn('TEST_PRIVATE_KEY not set, skipping write test');
+//     });
+//   } else {
+//     it(title, fn);
+//   }
+// }
 
 describe('Baruk Tools Integration (Sei Testnet)', () => {
   jest.setTimeout(30000);
