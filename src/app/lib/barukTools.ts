@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ethers } from 'ethers';
+import { ethers, InterfaceAbi } from 'ethers';
 import { BARUK_CONTRACTS, SEI_DEXS } from './types';
 import { getProtocolTokens } from './seiProtocols';
 import { getTokenBalance } from './mcpTools';
 import axios from 'axios';
-import ROUTER_ABI from '../../abi/BarukRouter.json';
-import AMM_ABI from '../../abi/BarukAMM.json';
-import YIELD_FARM_ABI from '../../abi/BarukYieldFarm.json';
+import ROUTER_ABI_RAW from '../../abi/BarukRouter.json';
+import AMM_ABI_RAW from '../../abi/BarukAMM.json';
+import YIELD_FARM_ABI_RAW from '../../abi/BarukYieldFarm.json';
+
+const ROUTER_ABI = ROUTER_ABI_RAW.abi as InterfaceAbi;
+const AMM_ABI = AMM_ABI_RAW.abi as InterfaceAbi;
+const YIELD_FARM_ABI = YIELD_FARM_ABI_RAW.abi as InterfaceAbi;
 import LENDING_ABI from '../../abi/BarukLending.json';
 import LIMIT_ORDER_ABI from '../../abi/BarukLimitOrder.json';
 import FACTORY_AMM from '../../abi/BarukAMMFactory.json';
@@ -20,10 +24,12 @@ const COVALENT_API_KEY = process.env.COVALENT_API_KEY;
 const SEI_CHAIN_ID = Number(process.env.SEI_CHAIN_ID) || 1328;
 
 
-const ORACLE_ABI = [
-  'function getExchangeRate(string memory denom) external view returns (uint256)',
-  'function getExchangeRates() external view returns (string[] memory, uint256[] memory)',
-];
+const ORACLE_ABI = {
+  abi: [
+    'function getExchangeRate(string memory denom) external view returns (uint256)',
+    'function getExchangeRates() external view returns (string[] memory, uint256[] memory)',
+  ]
+};
 
 // Helper function to get contract instance
 function getContract(address: string, abi: any) {
@@ -103,16 +109,24 @@ export async function swapTokens(params: {
     // Parameter validation
     const required = [
       'tokenIn', 'tokenOut', 'amountIn', 'minAmountOut', 'to', 'deadline', 'signer', 'userAddress'
-    ];
+    ] as const;
     for (const key of required) {
-      if (!(key in params) || params[key] === undefined || params[key] === null) {
+      if (!(key in params) || params[key as keyof typeof params] === undefined || params[key as keyof typeof params] === null) {
         throw new Error(`swapTokens: Missing required parameter: ${key}`);
       }
     }
 
     // Get token contracts with signer
-    const tokenInContract = new ethers.Contract(params.tokenIn, ERC20_ABI, params.signer);
-    const router = new ethers.Contract(BARUK_CONTRACTS.Router, ROUTER_ABI.abi, params.signer);
+    const tokenInContract = new ethers.Contract(
+      params.tokenIn,
+      ERC20_ABI.abi || ERC20_ABI,
+      params.signer
+    );
+    const router = new ethers.Contract(
+      BARUK_CONTRACTS.Router,
+      ROUTER_ABI.abi || ROUTER_ABI,
+      params.signer
+    );
 
     // Handle percentage amounts (e.g. "50%")
     let swapAmount: string = params.amountIn;
@@ -670,10 +684,16 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
     let nativeBalance = '0';
     try {
       nativeBalance = (await provider.getBalance(walletAddress)).toString();
-    // ...existing code...
+    
     } catch (e) {
       nativeBalance = '0';
     }
+    console.log('[Native Balance]', {
+      address: walletAddress,
+      nativeBalance: ethers.formatEther(nativeBalance),
+      rawBalance: nativeBalance
+    });
+
     const holdings = [
       {
         contract_address: 'native',
@@ -685,6 +705,8 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
       },
     ];
     // Add ERC-20s
+    console.log('[Token List]', tokens);
+    
     const erc20s = await Promise.all(
       tokens.map(async (token) => {
         try {
@@ -698,7 +720,8 @@ export async function getWalletTokenHoldings(walletAddress: string): Promise<any
             type: 'erc20',
           };
         } catch (e) {
-          return e; // Return null on error
+          console.error(`[Token Balance Error] ${token.symbol}:`, e);
+          return null; // Return null on error so we can filter it out
         }
       })
     );

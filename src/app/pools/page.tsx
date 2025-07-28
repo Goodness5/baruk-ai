@@ -1,9 +1,12 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useAppStore } from '../store/useAppStore';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol } from '../lib/seiProtocols';
+import { useContractInteraction } from '../lib/contracts';
+import { useBarukContract } from '../lib/useBarukContract';
 
 const pools = [
   {
@@ -35,6 +38,39 @@ export default function PoolsPage() {
   const tokenPricesError = useAppStore(s => s.tokenPricesError);
   const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
+  const { isConnected } = useContractInteraction();
+  const { callContract } = useBarukContract('yieldFarm');
+  const [loading, setLoading] = useState(false);
+
+  const handleStake = async (poolTokens: string[], amount: string) => {
+    if (!address || !amount || loading || !isConnected) return;
+    setLoading(true);
+    try {
+      await callContract(
+        'stake',
+        [poolTokens[0], poolTokens[1], BigInt(amount)],
+        { account: address }
+      );
+    } catch (err) {
+      console.error('Failed to stake:', err);
+    }
+    setLoading(false);
+  };
+
+  const handleUnstake = async (poolTokens: string[], amount: string) => {
+    if (!address || !amount || loading || !isConnected) return;
+    setLoading(true);
+    try {
+      await callContract(
+        'unstake',
+        [poolTokens[0], poolTokens[1], BigInt(amount)],
+        { account: address }
+      );
+    } catch (err) {
+      console.error('Failed to unstake:', err);
+    }
+    setLoading(false);
+  };
 
   const getSymbol = (address: string) => tokens.find(t => t.address.toLowerCase() === address.toLowerCase())?.symbol || address.slice(0, 6);
   const getPrice = (address: string) => tokenPrices[address.toLowerCase()];

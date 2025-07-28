@@ -23,6 +23,22 @@ export interface TokenInfo {
   price?: string;
 }
 
+export interface TokenHolding {
+  contract_address: string;
+  symbol: string;
+  name: string;
+  balance: string;
+  decimals: number;
+  type: 'native' | 'erc20';
+  logo_url?: string;
+  quote?: number;
+}
+
+export interface TokenError {
+  error: string;
+  details?: string;
+}
+
 export interface NFTInfo {
   address: string;
   tokenId: string;

@@ -7,7 +7,11 @@ export type Token = {
 
 export type Balance = {
   token: string;
+  symbol: string;
   amount: string;
+  decimals: number;
+  type?: 'native' | 'erc20';
+  name?: string;
 };
 
 interface AppState {

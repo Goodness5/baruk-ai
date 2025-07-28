@@ -6,6 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol } from '../lib/seiProtocols';
 import { useContractInteraction } from '../lib/contracts';
+import { useBarukContract } from '../lib/useBarukContract';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -26,7 +27,8 @@ export default function BorrowPage() {
   const [loading, setLoading] = useState(false);
   const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
-  const { executeContract, isConnected } = useContractInteraction();
+  const { callContract } = useBarukContract('lending');
+  const { isConnected } = useContractInteraction();
 
   const asset = assets.find(a => a.symbol === selected)!;
   const price = tokenPrices[asset.address.toLowerCase()];
@@ -49,9 +51,7 @@ export default function BorrowPage() {
     setLoading(true);
     toast.loading('Storing your magic...', { id: 'supply' });
     try {
-      await executeContract(
-        protocol.type,
-        'lending',
+      await callContract(
         'depositAndBorrow',
         [asset.address, BigInt(supplyAmount), address],
         { account: address }
@@ -75,9 +75,7 @@ export default function BorrowPage() {
     setLoading(true);
     toast.loading('Borrowing magic...', { id: 'borrow' });
     try {
-      await executeContract(
-        protocol.type,
-        'lending',
+      await callContract(
         'depositAndBorrow',
         [asset.address, BigInt(borrowAmount), address],
         { account: address }

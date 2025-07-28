@@ -7,6 +7,7 @@ import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
 import { useContractInteraction } from '../lib/contracts';
+import { useBarukContract } from '../lib/useBarukContract';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
@@ -24,10 +25,45 @@ export default function GrowPage() {
   const [amountA, setAmountA] = useState('');
   const [amountB, setAmountB] = useState('');
   const [loading, setLoading] = useState(false);
-  const { executeContract, isConnected } = useContractInteraction();
+  const { isConnected } = useContractInteraction();
+  const { callContract } = useBarukContract('ammFactory');
 
   const balanceA = balances.find(b => b.token === tokenA)?.amount || '0';
   const balanceB = balances.find(b => b.token === tokenB)?.amount || '0';
+
+  const handleAddLiquidity = async () => {
+    if (!address || !amountA || !amountB || loading || !isConnected) return;
+    setLoading(true);
+    try {
+      await callContract(
+        'addLiquidity',
+        [tokenA, tokenB, BigInt(amountA), BigInt(amountB), BigInt(0), BigInt(0), address, BigInt(Math.floor(Date.now() / 1000) + 600)],
+        { account: address }
+      );
+      toast.success('Liquidity added successfully! ✨');
+    } catch (err) {
+      console.error('Failed to add liquidity:', err);
+      toast.error('Failed to add liquidity');
+    }
+    setLoading(false);
+  };
+
+  const handleRemoveLiquidity = async () => {
+    if (!address || !amountA || !amountB || loading || !isConnected) return;
+    setLoading(true);
+    try {
+      await callContract(
+        'removeLiquidity',
+        [tokenA, tokenB, BigInt(amountA), BigInt(0), BigInt(0), address, BigInt(Math.floor(Date.now() / 1000) + 600)],
+        { account: address }
+      );
+      toast.success('Liquidity removed successfully! 🔄');
+    } catch (err) {
+      console.error('Failed to remove liquidity:', err);
+      toast.error('Failed to remove liquidity');
+    }
+    setLoading(false);
+  };
   const priceA = tokenPrices[tokenA.toLowerCase()];
   const priceB = tokenPrices[tokenB.toLowerCase()];
 

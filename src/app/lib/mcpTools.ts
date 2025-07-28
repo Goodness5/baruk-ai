@@ -216,7 +216,7 @@ export async function getBlock(blockNumber: number): Promise<BlockInfo> {
 
     return {
       number: block.number,
-      hash: block.hash,
+      hash: block.hash || '',
       timestamp: block.timestamp,
       transactions: [...block.transactions],
       gasUsed: block.gasUsed.toString(),

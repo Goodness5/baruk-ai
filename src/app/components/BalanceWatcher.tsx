@@ -1,8 +1,9 @@
 "use client"
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { fetchBalancesWithRetry } from '../lib/balance';
+import { getWalletTokenHoldings } from '../lib/barukTools';
 import { useUnifiedWallet } from '../lib/unifiedWallet';
+import { TokenHolding, TokenError } from '../lib/types';
 
 export default function BalanceWatcher() {
   const address = useAppStore(s => s.address);
@@ -17,7 +18,10 @@ export default function BalanceWatcher() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
   // Use Baruk test tokens for balance watching
+  // Common tokens to watch for
   const tokens = useMemo(() => [
+    // Sei Test Tokens
+    { symbol: 'SEI', address: 'native' }, // Native SEI token
     { symbol: 'TOKEN0', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
     { symbol: 'TOKEN1', address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7' },
     { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
@@ -35,10 +39,23 @@ export default function BalanceWatcher() {
     setBalancesError(null);
     
     try {
-      const newBalances = await fetchBalancesWithRetry(address, tokens);
-      setBalances(newBalances);
-      setBalancesLoading(false);
-      setLastUpdate(new Date());
+      const holdings = await getWalletTokenHoldings(address) as (TokenHolding[] | TokenError[]);
+      if (Array.isArray(holdings) && 'contract_address' in (holdings[0] || {})) {
+        const newBalances = (holdings as TokenHolding[]).map(token => ({
+          token: token.contract_address,
+          symbol: token.symbol,
+          amount: token.balance,
+          decimals: token.decimals,
+          type: token.type,
+          name: token.name
+        }));
+        setBalances(newBalances);
+        setBalancesLoading(false);
+        setLastUpdate(new Date());
+      } else if ('error' in (holdings[0] || {})) {
+        setBalancesError((holdings[0] as TokenError).error);
+        setBalancesLoading(false);
+      }
     } catch (err: unknown) {
       if (typeof err === 'object' && err !== null && 'message' in err) {
         setBalancesError((err as { message?: string }).message || 'Failed to fetch balances');
@@ -47,7 +64,7 @@ export default function BalanceWatcher() {
       }
       setBalancesLoading(false);
     }
-  }, [address, isConnected, setBalances, setBalancesLoading, setBalancesError, tokens]);
+  }, [address, isConnected, setBalances, setBalancesLoading, setBalancesError]);
 
   // Initial fetch
   useEffect(() => {

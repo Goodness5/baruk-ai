@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState } from 'react';
 import { motion } from 'framer-motion';
@@ -5,6 +6,7 @@ import { SparklesIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
 import { useContractInteraction } from '../lib/contracts';
+import { useBarukContract } from '../lib/useBarukContract';
 import TokenSelector from '../components/TokenSelector';
 import toast from 'react-hot-toast';
 
@@ -28,6 +30,7 @@ export default function TriggersPage() {
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const { callContract } = useBarukContract('limitOrder');
   const { executeContract, isConnected } = useContractInteraction();
 
   const balanceIn = balances.find(b => b.token === tokenIn)?.amount || '0';
@@ -52,9 +55,7 @@ export default function TriggersPage() {
     setLoading(true);
     toast.loading('Setting your trigger...', { id: 'trigger' });
     try {
-      await executeContract(
-        protocol.type,
-        'limitOrder',
+      await callContract(
         'placeOrder',
         [tokenIn, tokenOut, BigInt(amount), BigInt(price)],
         { account: address }

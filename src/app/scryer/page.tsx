@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState } from "react";
 import { useAI } from "../components/AIContext";
@@ -9,7 +10,7 @@ export default function ScryerPage() {
   const chat = state.chat;
   const [loading, setLoading] = useState(false);
   const sendMessage = async (msg: { role: 'user' | 'ai'; content: string }) => {
-    dispatch({ type: 'SEND_MESSAGE', message: msg });
+    dispatch({ type: 'SEND_MESSAGE', message: { ...msg, timestamp: Date.now() } });
     if (msg.role === 'user') {
       setLoading(true);
       try {
@@ -19,9 +20,9 @@ export default function ScryerPage() {
           body: JSON.stringify({ prompt: msg.content }),
         });
         const data = await res.json();
-        dispatch({ type: 'SEND_MESSAGE', message: { role: 'ai', content: data.message } });
+        dispatch({ type: 'SEND_MESSAGE', message: { role: 'ai', content: data.message, timestamp: Date.now() } });
       } catch (e) {
-        dispatch({ type: 'SEND_MESSAGE', message: { role: 'ai', content: 'Sorry, Baruk could not answer right now.' } });
+        dispatch({ type: 'SEND_MESSAGE', message: { role: 'ai', content: 'Sorry, Baruk could not answer right now.', timestamp: Date.now() } });
       }
       setLoading(false);
     }

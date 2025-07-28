@@ -8,8 +8,22 @@ const erc20Abi = [
     "name": "balanceOf",
     "outputs": [{"name": "balance", "type": "uint256"}],
     "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [{"name": "", "type": "uint8"}],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"name": "", "type": "string"}],
+    "type": "function"
   }
-] as const; // Use a minimal ERC20 ABI if available
+] as const;
 import type { Token } from '../store/useAppStore';
 
 const client = createPublicClient({
@@ -17,7 +31,7 @@ const client = createPublicClient({
   transport: http()
 });
 
-export async function fetchBalances(address: string, tokens: Token[]): Promise<{ token: string; amount: string }[]> {
+export async function fetchBalances(address: string, tokens: Token[]): Promise<{ token: string; symbol: string; amount: string; decimals: number }[]> {
   if (!address || tokens.length === 0) {
     return [];
   }
@@ -27,26 +41,58 @@ export async function fetchBalances(address: string, tokens: Token[]): Promise<{
       try {
         // For EVM tokens
         if (token.address.startsWith('0x')) {
-          const amount = await client.readContract({
-            address: token.address as `0x${string}`,
-            abi: erc20Abi,
-            functionName: 'balanceOf',
-            args: [address]
-          });
-          return { token: token.address, amount: amount?.toString() ?? '0' };
+          const contractAddress = token.address as `0x${string}`;
+          
+          // Fetch balance, decimals, and symbol in parallel
+          const [rawAmount, decimals, fetchedSymbol] = await Promise.all([
+            client.readContract({
+              address: contractAddress,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [address]
+            }),
+            client.readContract({
+              address: contractAddress,
+              abi: erc20Abi,
+              functionName: 'decimals',
+            }).catch(() => 18), // Default to 18 decimals if call fails
+            client.readContract({
+              address: contractAddress,
+              abi: erc20Abi,
+              functionName: 'symbol',
+            }).catch(() => token.symbol) // Fall back to provided symbol
+          ]);
+
+          const amount = rawAmount?.toString() ?? '0';
+          return { 
+            token: token.address, 
+            symbol: fetchedSymbol || token.symbol,
+            amount,
+            decimals: Number(decimals)
+          };
         } else {
-          // For Cosmos tokens, we'll need to implement Cosmos balance fetching
-          // For now, return 0 for non-EVM tokens
-          return { token: token.address, amount: '0' };
+          // For Cosmos tokens, return with default values
+          return { 
+            token: token.address, 
+            symbol: token.symbol,
+            amount: '0',
+            decimals: 18
+          };
         }
       } catch (error) {
         console.warn(`Failed to fetch balance for token ${token.address}:`, error);
-        return { token: token.address, amount: '0' };
+        return { 
+          token: token.address, 
+          symbol: token.symbol,
+          amount: '0',
+          decimals: 18
+        };
       }
     })
   );
 
-  return balances.filter(balance => balance.amount !== '0' || true); // Show all tokens including zero balances
+  // Filter out failed requests but keep tokens with zero balance for display
+  return balances.filter(balance => balance.symbol);
 }
 
 // Enhanced balance watcher with retry logic
