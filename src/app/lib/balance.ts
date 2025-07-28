@@ -50,17 +50,17 @@ export async function fetchBalances(address: string, tokens: Token[]): Promise<{
               abi: erc20Abi,
               functionName: 'balanceOf',
               args: [address]
-            }),
+            }) as Promise<bigint>,
             client.readContract({
               address: contractAddress,
               abi: erc20Abi,
               functionName: 'decimals',
-            }).catch(() => 18), // Default to 18 decimals if call fails
+            }).catch(() => 18) as Promise<number>, // Default to 18 decimals if call fails
             client.readContract({
               address: contractAddress,
               abi: erc20Abi,
               functionName: 'symbol',
-            }).catch(() => token.symbol) // Fall back to provided symbol
+            }).catch(() => token.symbol) as Promise<string> // Fall back to provided symbol
           ]);
 
           const amount = rawAmount?.toString() ?? '0';
