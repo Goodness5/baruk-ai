@@ -2,13 +2,14 @@
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useState, useEffect } from 'react';
 import { seiTestnet } from '../../chains/seiTestnet';
+import { config } from '../../wagmi';
 
 export default function ConnectWallet() {
   const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isLoading, pendingConnector, error } = useConnect();
   const { disconnect } = useDisconnect();
   const [isOpen, setIsOpen] = useState(false);
-  const [availableConnectors, setAvailableConnectors] = useState<any[]>([]);
+  const [availableConnectors, setAvailableConnectors] = useState<typeof connectors>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false);
 
@@ -52,25 +53,38 @@ export default function ConnectWallet() {
     }
   }, [isConnected]);
 
+  // Update the logic to prioritize MetaMask (injected wallet) when available
   useEffect(() => {
-    // Check for available wallets and update connectors
-    const checkWallets = () => {
-      const ready = connectors.filter(connector => {
-        // Check if MetaMask is available
-        if (connector.id === 'injected') {
-          return typeof window !== 'undefined' && window.ethereum;
-        }
-        return connector.ready;
-      });
-      setAvailableConnectors(ready);
-    };
+    // Update available connectors using wagmi hooks
+    const readyConnectors = connectors.filter((connector) => {
+      if (connector.id === 'metaMask') {
+        return typeof window !== 'undefined' && window.ethereum?.isMetaMask;
+      }
+      return connector.ready || connector.type === 'metaMask';
+    });
 
-    checkWallets();
-    
-    // Re-check wallets periodically
-    const interval = setInterval(checkWallets, 1000);
-    return () => clearInterval(interval);
+    // Log connectors for debugging
+    console.log('Available connectors:', readyConnectors);
+
+    // Sort connectors to prioritize MetaMask
+    readyConnectors.sort((a, b) => (a.id === 'metaMask' ? -1 : b.id === 'metaMask' ? 1 : 0));
+
+    setAvailableConnectors(readyConnectors);
   }, [connectors]);
+
+  const handleConnect = async (connector: typeof connectors[number]) => {
+    try {
+      await connect({ connector });
+      setIsOpen(false);
+    } catch (err) {
+      console.error('Connection failed:', err);
+    }
+  };
+
+  // Ensure the wagmi configuration is applied
+  useEffect(() => {
+    console.log('Wagmi config:', config);
+  }, []);
 
   // Don't render anything until client-side
   if (!isMounted) {
@@ -111,15 +125,15 @@ export default function ConnectWallet() {
         onClick={() => setIsOpen(!isOpen)}
         className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
       >
-        Connect Wallet
+        {isConnected ? `${address?.slice(0, 6)}...${address?.slice(-4)}` : 'Connect Wallet'}
       </button>
-      
+
       {error && (
         <div className="absolute top-full mt-2 right-0 bg-red-800 border border-red-600 rounded-lg shadow-lg z-50 min-w-[300px] p-3">
           <div className="text-red-200 text-sm">Error: {error.message}</div>
         </div>
       )}
-      
+
       {isOpen && (
         <div className="absolute top-full mt-2 right-0 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50 min-w-[250px]">
           <div className="p-3 border-b border-gray-700">
@@ -130,16 +144,13 @@ export default function ConnectWallet() {
             availableConnectors.map((connector) => (
               <button
                 key={connector.id}
-                onClick={() => {
-                  connect({ connector });
-                  setIsOpen(false);
-                }}
+                onClick={() => handleConnect(connector)}
                 disabled={isLoading}
                 className="w-full px-4 py-3 text-left hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-b border-gray-700 last:border-b-0"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm">
-                    {connector.id === 'injected' ? 'MetaMask' : connector.name}
+                    {connector.id === 'metaMask' ? 'MetaMask' : connector.name}
                   </span>
                   {isLoading && connector.id === pendingConnector?.id && (
                     <span className="text-xs text-blue-400">Connecting...</span>
@@ -153,13 +164,10 @@ export default function ConnectWallet() {
               <div className="text-xs text-gray-500 mt-1">
                 Please install MetaMask or another wallet extension
               </div>
-              <div className="text-xs text-gray-600 mt-2">
-                Debug: {connectors.length} connectors available
-              </div>
             </div>
           )}
         </div>
       )}
     </div>
   );
-} 
+}
