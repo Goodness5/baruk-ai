@@ -129,6 +129,16 @@ export function getProtocolTokens(protocolId: string): Token[] {
   if (protocol?.contracts?.tokens) {
     return protocol.contracts.tokens as Token[];
   }
+  
+  // If no tokens found in protocol, return default tokens
+  if (protocolId === 'baruk') {
+    return [
+      { symbol: 'TOKEN0', address: '0x8923889697C9467548ABe8E815105993EBC785b6' },
+      { symbol: 'TOKEN1', address: '0xF2C653e2a1F21ef409d0489C7c1d754d9f2905F7' },
+      { symbol: 'TOKEN2', address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7' },
+    ];
+  }
+  
   // Official Sei EVM testnet tokens (Atlantic-2)
   return [
     {

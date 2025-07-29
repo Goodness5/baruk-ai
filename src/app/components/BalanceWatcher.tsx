@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { getWalletTokenHoldings } from '../lib/barukTools';
-import { useUnifiedWallet } from '../lib/unifiedWallet';
+import { useAccount } from 'wagmi';
 import { TokenHolding, TokenError } from '../lib/types';
 
 export default function BalanceWatcher() {
@@ -14,8 +14,19 @@ export default function BalanceWatcher() {
   const setBalancesLoading = useAppStore(s => s.setBalancesLoading);
   const setBalancesError = useAppStore(s => s.setBalancesError);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const { isConnected, type } = useUnifiedWallet();
+  const { isConnected, address: wagmiAddress } = useAccount();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  
+  // Use the wagmi address if available, otherwise fall back to store address
+  const currentAddress = wagmiAddress || address;
+  
+  console.log('BalanceWatcher Debug:', {
+    isConnected,
+    wagmiAddress,
+    storeAddress: address,
+    currentAddress,
+    balancesLength: balances.length
+  });
   
   // Use Baruk test tokens for balance watching
   // Common tokens to watch for
@@ -28,7 +39,10 @@ export default function BalanceWatcher() {
   ], []);
 
   const fetchAndUpdateBalances = useCallback(async () => {
-    if (!address || !isConnected) {
+    console.log('fetchAndUpdateBalances called:', { currentAddress, isConnected });
+    
+    if (!currentAddress || !isConnected) {
+      console.log('Not fetching balances - not connected or no address');
       setBalances([]);
       setBalancesLoading(false);
       setBalancesError(null);
@@ -39,7 +53,10 @@ export default function BalanceWatcher() {
     setBalancesError(null);
     
     try {
-      const holdings = await getWalletTokenHoldings(address) as (TokenHolding[] | TokenError[]);
+      console.log('Fetching balances for address:', currentAddress);
+      const holdings = await getWalletTokenHoldings(currentAddress) as (TokenHolding[] | TokenError[]);
+      console.log('Raw holdings:', holdings);
+      
       if (Array.isArray(holdings) && 'contract_address' in (holdings[0] || {})) {
         const newBalances = (holdings as TokenHolding[]).map(token => ({
           token: token.contract_address,
@@ -49,14 +66,17 @@ export default function BalanceWatcher() {
           type: token.type,
           name: token.name
         }));
+        console.log('Processed balances:', newBalances);
         setBalances(newBalances);
         setBalancesLoading(false);
         setLastUpdate(new Date());
       } else if ('error' in (holdings[0] || {})) {
+        console.log('Error in holdings:', holdings[0]);
         setBalancesError((holdings[0] as TokenError).error);
         setBalancesLoading(false);
       }
     } catch (err: unknown) {
+      console.error('Error fetching balances:', err);
       if (typeof err === 'object' && err !== null && 'message' in err) {
         setBalancesError((err as { message?: string }).message || 'Failed to fetch balances');
       } else {
@@ -64,22 +84,22 @@ export default function BalanceWatcher() {
       }
       setBalancesLoading(false);
     }
-  }, [address, isConnected, setBalances, setBalancesLoading, setBalancesError]);
+  }, [currentAddress, isConnected, setBalances, setBalancesLoading, setBalancesError]);
 
   // Initial fetch
   useEffect(() => {
     fetchAndUpdateBalances();
-  }, [address, tokens, isConnected, fetchAndUpdateBalances]);
+  }, [currentAddress, tokens, isConnected, fetchAndUpdateBalances]);
 
   // Real-time updates every 10 seconds
   useEffect(() => {
-    if (!address || !isConnected) return;
+    if (!currentAddress || !isConnected) return;
     const interval = setInterval(fetchAndUpdateBalances, 10000); // 10 seconds
     return () => clearInterval(interval);
-  }, [address, tokens, isConnected, fetchAndUpdateBalances]);
+  }, [currentAddress, tokens, isConnected, fetchAndUpdateBalances]);
 
   // Don't render anything if not connected
-  if (!isConnected || !address) return null;
+  if (!isConnected || !currentAddress) return null;
 
   const getTokenSymbol = (tokenAddress: string) => {
     return tokens.find(t => t.address.toLowerCase() === tokenAddress.toLowerCase())?.symbol || 'Unknown';
@@ -110,7 +130,7 @@ export default function BalanceWatcher() {
             <span>💰</span>
             Wallet Balances
             <span className="text-xs text-purple-300">
-              ({type?.includes('internal') ? 'Internal' : 'External'} Wallet)
+              (Connected Wallet)
             </span>
           </h3>
           <div className="text-xs text-purple-300">
