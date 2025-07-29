@@ -8,7 +8,6 @@ import TokenPriceWatcher from './components/TokenPriceWatcher';
 import AIOrb from './components/AIOrb';
 import { AIProvider } from './components/AIContext';
 import { Toaster } from 'react-hot-toast';
-import '@rainbow-me/rainbowkit/styles.css';
 import { Providers } from './providers';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

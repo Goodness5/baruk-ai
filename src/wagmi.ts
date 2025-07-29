@@ -1,10 +1,20 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+import { http, createConfig } from 'wagmi';
 import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains';
 import { seiTestnet } from './chains/seiTestnet';
+import { injected } from 'wagmi/connectors';
 
-export const config = getDefaultConfig({
-  appName: 'Baruk DeFi',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
-  chains: [mainnet, polygon, arbitrum, optimism, seiTestnet],
+export const config = createConfig({
+  chains: [seiTestnet, mainnet, polygon, arbitrum, optimism],
+  connectors: [
+    injected({ target: 'metaMask' }),
+    injected(),
+  ],
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [arbitrum.id]: http(),
+    [optimism.id]: http(),
+    [seiTestnet.id]: http('https://evm-rpc-testnet.sei-apis.com'),
+  },
   ssr: true,
 }); 

@@ -11,6 +11,7 @@ import { useContractInteraction } from '../lib/contracts';
 import { useBarukContract } from '../lib/useBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
+import { useAccount } from 'wagmi';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -29,7 +30,7 @@ export default function TradePage() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const { callContract, callTokenContract } = useBarukContract('router');
-  const { isConnected } = useContractInteraction();
+  const { isConnected: wagmiIsConnected, address: wagmiAddress } = useAccount();
 
   const tokenInBalance = balances.find(b => b.token === tokenIn)?.amount || '0';
   const tokenOutBalance = balances.find(b => b.token === tokenOut)?.amount || '0';
@@ -49,7 +50,7 @@ export default function TradePage() {
   };
 
   const handleTrade = async () => {
-    if (!address || !amount || loading || !isConnected) return;
+    if (!address || !amount || loading || !wagmiIsConnected) return;
     setLoading(true);
     toast.loading('Magic in progress...', { id: 'trade' });
     try {
@@ -97,7 +98,7 @@ export default function TradePage() {
   // Fetch balances when wallet is connected
   useEffect(() => {
     const fetchBalances = async () => {
-      if (!address || !isConnected) {
+      if (!address || !wagmiIsConnected) {
         setBalances([]);
         return;
       }
@@ -129,7 +130,7 @@ export default function TradePage() {
     // Set up polling every 10 seconds
     const interval = setInterval(fetchBalances, 10000);
     return () => clearInterval(interval);
-  }, [address, isConnected, setBalances, setBalancesError]);
+  }, [address, wagmiIsConnected, setBalances, setBalancesError]);
 
   // Get user's available tokens and format amounts properly
   const userTokens = balances.map(b => ({
@@ -198,8 +199,8 @@ export default function TradePage() {
                   className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
                 />
                 <TokenSelector
-                  selectedToken={tokenIn}
-                  onSelect={setTokenIn}
+                  value={tokenIn}
+                  onChange={setTokenIn}
                   tokens={protocolTokens}
                   className="min-w-[120px]"
                 />
@@ -235,8 +236,8 @@ export default function TradePage() {
                   {amount ? (parseFloat(amount) * (priceIn / priceOut)).toFixed(6) : '0.0'}
                 </div>
                 <TokenSelector
-                  selectedToken={tokenOut}
-                  onSelect={setTokenOut}
+                  value={tokenOut}
+                  onChange={setTokenOut}
                   tokens={protocolTokens}
                   className="min-w-[120px]"
                 />
@@ -250,14 +251,14 @@ export default function TradePage() {
           {/* Swap Button */}
           <button
             onClick={handleTrade}
-            disabled={!isConnected || !amount || loading}
+            disabled={!wagmiIsConnected || !amount || loading}
             className={`w-full mt-6 py-4 rounded-xl text-lg font-semibold transition-all
-              ${!isConnected || !amount || loading
+              ${!wagmiIsConnected || !amount || loading
                 ? 'bg-purple-900/50 text-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white'
               }`}
           >
-            {!isConnected
+            {!wagmiIsConnected
               ? 'Connect Wallet'
               : loading
               ? 'Swapping... ✨'
