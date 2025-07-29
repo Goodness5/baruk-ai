@@ -17,4 +17,4 @@ export const config = createConfig({
     [seiTestnet.id]: http('https://evm-rpc-testnet.sei-apis.com'),
   },
   ssr: true,
-}); 
+});

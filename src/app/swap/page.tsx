@@ -7,8 +7,7 @@ import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
-import { useContractInteraction } from '../lib/contracts';
-import { useBarukContract } from '../lib/useBarukContract';
+import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -16,112 +15,230 @@ import { useAccount } from 'wagmi';
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function TradePage() {
+  const { address, isConnected: wagmiIsConnected } = useAccount();
   const balances = useAppStore(s => s.balances);
+  const balancesLoading = useAppStore(s => s.balancesLoading);
+  const balancesError = useAppStore(s => s.balancesError);
   const setBalances = useAppStore(s => s.setBalances);
   const setBalancesError = useAppStore(s => s.setBalancesError);
-  const address = useAppStore(s => s.address);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
-  const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
-  const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
-  const protocolTokens = getProtocolTokens(protocolId);
-  const [tokenIn, setTokenIn] = useState(protocolTokens[0]?.address || '');
-  const [tokenOut, setTokenOut] = useState(protocolTokens[1]?.address || '');
-  const [amount, setAmount] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { callContract, callTokenContract } = useBarukContract('router');
-  const { isConnected: wagmiIsConnected, address: wagmiAddress } = useAccount();
+  const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
 
-  const tokenInBalance = balances.find(b => b.token === tokenIn)?.amount || '0';
-  const tokenOutBalance = balances.find(b => b.token === tokenOut)?.amount || '0';
-  const priceIn = tokenPrices[tokenIn.toLowerCase()];
-  const priceOut = tokenPrices[tokenOut.toLowerCase()];
+  const [tokenIn, setTokenIn] = useState('TOKEN0');
+  const [tokenOut, setTokenOut] = useState('TOKEN1');
+  const [amount, setAmount] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Get protocol and tokens
+  const protocol = getSeiProtocolById(DEFAULT_PROTOCOL_ID) as SeiProtocol;
+  const protocolTokens = getProtocolTokens(DEFAULT_PROTOCOL_ID);
+  
+  // Add SEI as a native token option
+  const allTokens = [
+    { symbol: 'SEI', address: 'native' }, // Native SEI token
+    ...protocolTokens
+  ];
+  
+  // console.log('Available tokens:', allTokens);
+  // console.log('Current balances:', balances);
+  // console.log('Selected tokens:', { tokenIn, tokenOut });
+  // console.log('Wallet connection state:', { 
+  //   wagmiIsConnected, 
+  //   address
+  // });
+
+
+
+  // Helper function to format amounts considering decimals
+  const formatFromDecimals = (amount: string, decimals: number) => {
+    try {
+      const value = BigInt(amount);
+      const divisor = BigInt(10 ** decimals);
+      const integerPart = value / divisor;
+      const fractionalPart = value % divisor;
+      
+      // Convert fractional part to string and pad with zeros
+      const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+      
+      // Combine integer and fractional parts
+      const fullNumber = `${integerPart}.${fractionalStr}`;
+      
+      // Remove trailing zeros after decimal point
+      const trimmed = fullNumber.replace(/\.?0+$/, '');
+      
+      // If the number is very large, format it with commas
+      if (integerPart > 999999) {
+        const parts = trimmed.split('.');
+        const integerWithCommas = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return parts.length > 1 ? `${integerWithCommas}.${parts[1]}` : integerWithCommas;
+      }
+      
+      return trimmed;
+    } catch (error) {
+      console.error('Error formatting decimals:', error);
+      return '0';
+    }
+  };
 
   const getUSDValue = (amount: string, price: number) => {
-    const amountNum = parseFloat(amount) || 0;
-    return (price * amountNum).toFixed(2);
+    const num = parseFloat(amount) || 0;
+    return (num * price).toFixed(2);
+  };
+
+  // Helper function to calculate receive amount
+  const calculateReceiveAmount = (amount: string, priceIn: number, priceOut: number): string => {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) return '0.0';
+    
+    // If both prices are 0, we can't calculate a ratio
+    if (priceIn === 0 && priceOut === 0) {
+      // For now, assume 1:1 ratio for same token or show placeholder
+      if (tokenIn === tokenOut) {
+        return amountNum.toFixed(6);
+      } else {
+        // Try to use mock prices for test tokens
+        const mockPrices: Record<string, number> = {
+          'TOKEN0': 1.5,
+          'TOKEN1': 2.3,
+          'TOKEN2': 0.8,
+        };
+        const mockPriceIn = mockPrices[tokenIn] || 0;
+        const mockPriceOut = mockPrices[tokenOut] || 0;
+        
+        if (mockPriceIn > 0 && mockPriceOut > 0) {
+          const receiveAmount = amountNum * (mockPriceIn / mockPriceOut);
+          return receiveAmount.toFixed(6);
+        }
+        
+        return '0.0'; // No price data available
+      }
+    }
+    
+    // If one price is 0, we can't calculate
+    if (priceIn === 0 || priceOut === 0) {
+      return '0.0'; // No price data available
+    }
+    
+    // Calculate the receive amount based on price ratio
+    const receiveAmount = amountNum * (priceIn / priceOut);
+    return receiveAmount.toFixed(6);
   };
 
   const formatBalance = (amount: string) => {
-    const num = parseFloat(amount);
-    if (num === 0) return '0';
-    if (num < 0.0001) return '< 0.0001';
-    return num.toFixed(4);
+    console.log('formatBalance called with:', { amount, type: typeof amount });
+    try {
+      const num = parseFloat(amount);
+      console.log('parseFloat result:', num);
+      if (num === 0) return '0';
+      if (num < 0.0001) return '< 0.0001';
+      
+      // For very large numbers, use a more readable format
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(2) + 'K';
+      }
+      
+      return num.toFixed(4);
+    } catch (error) {
+      console.error('Error formatting balance:', error);
+      return '0';
+    }
   };
 
   const handleTrade = async () => {
-    if (!address || !amount || loading || !wagmiIsConnected) return;
-    setLoading(true);
-    toast.loading('Magic in progress...', { id: 'trade' });
+    if (!address || !wagmiIsConnected) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    // Check if wagmi wallet is connected
+    if (!wagmiIsConnected || !address) {
+      toast.error('Please connect your MetaMask wallet first');
+      return;
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    if (tokenIn === tokenOut) {
+      toast.error('Cannot swap the same token');
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      // Convert amount to Wei (1e18)
+      // Find token addresses
+      const tokenInData = allTokens.find(t => t.symbol === tokenIn);
+      const tokenOutData = allTokens.find(t => t.symbol === tokenOut);
+
+      if (!tokenInData || !tokenOutData) {
+        toast.error('Token not found');
+        return;
+      }
+
+      // Handle native SEI token
+      if (tokenInData.address === 'native') {
+        toast.error('Native SEI swaps not yet implemented');
+        setIsLoading(false);
+        return;
+      }
+
+      if (tokenOutData.address === 'native') {
+        toast.error('Native SEI swaps not yet implemented');
+        setIsLoading(false);
+        return;
+      }
+
+      // Convert amount to wei (assuming 18 decimals for simplicity)
       const amountInWei = parseUnits(amount, 18);
-      const slippage = 0.99; // 1% slippage
-      const minOutWei = parseUnits((parseFloat(amount) * slippage).toFixed(18), 18);
-      const deadlineTime = BigInt(Math.floor(Date.now() / 1000) + 600); // 10 minutes
+      console.log('Approval arguments:', { 
+        tokenInDataAddress: tokenInData.address, 
+        routerAddress: contractAddresses.router, 
+        amountInWei: amountInWei.toString(),
+        amountInWeiType: typeof amountInWei
+      });
 
       // First approve the router to spend tokens
-      await callTokenContract(
-        tokenIn,
+      await wagmiCallTokenContract(
+        tokenInData.address,
         'approve',
         [contractAddresses.router, amountInWei]
       );
 
       // Then perform the swap
-      await callContract(
-        'swapExactTokensForTokens',
-        [amountInWei, minOutWei, [tokenIn, tokenOut], address, deadlineTime],
-        { account: address }
-      );
-      const minAmountOut = 0n;
-      const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
-      const recipient = address as `0x${string}`;
-      await callContract(
+      await wagmiCallContract(
         'swap',
-        [tokenIn, tokenOut, BigInt(amount), minAmountOut, deadline, recipient],
-        { account: recipient }
+        [tokenInData.address, tokenOutData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
-      toast.success('Trade complete! ✨', { id: 'trade' });
-    } catch (err: unknown) {
-      let msg = 'Unknown error';
-      if (typeof err === 'object' && err !== null && 'message' in err) {
-        msg = (err as { message?: string }).message || msg;
-      } else if (typeof err === 'string') {
-        msg = err;
-      }
-      toast.error('Trade failed: ' + msg, { id: 'trade' });
+
+      toast.success('Swap completed successfully!');
+      
+      // Reset form
+      setAmount('');
+    } catch (error) {
+      console.error('Swap error:', error);
+      toast.error('Swap failed. Please try again.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // Fetch balances when wallet is connected
+
+
+  // Fetch balances when wallet connects
   useEffect(() => {
     const fetchBalances = async () => {
-      if (!address || !wagmiIsConnected) {
-        setBalances([]);
-        return;
-      }
+      if (!address || !wagmiIsConnected) return;
+      
       try {
-        const { getWalletTokenHoldings } = await import('../lib/barukTools');
-        const holdings = await getWalletTokenHoldings(address);
-        console.log('first', holdings);
-        if (Array.isArray(holdings) && holdings[0]?.contract_address) {
-          const newBalances = holdings.map(token => ({
-            token: token.contract_address,
-            symbol: token.symbol,
-            amount: token.balance,
-            decimals: token.decimals,
-            type: token.type,
-            name: token.name
-          }));
-          setBalances(newBalances);
-        } else {
-          console.error('Invalid holdings format:', holdings);
-          setBalancesError('Failed to fetch token balances');
-        }
-      } catch (err) {
-        console.error('Error fetching balances:', err);
+        // This would typically call an API or contract to get balances
+        // For now, we'll use the balances from the store
+        console.log('Fetching balances for address:', address);
+      } catch (error) {
+        console.error('Error fetching balances:', error);
         setBalancesError('Failed to fetch balances');
       }
     };
@@ -139,15 +256,60 @@ export default function TradePage() {
     usdValue: getUSDValue(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
   })).filter(b => parseFloat(b.displayAmount) > 0);
 
-  // Helper function to format amounts considering decimals
-  const formatFromDecimals = (amount: string, decimals: number) => {
-    const value = BigInt(amount);
-    const divisor = BigInt(10 ** decimals);
-    const integerPart = value / divisor;
-    const fractionalPart = value % divisor;
-    const paddedFractional = fractionalPart.toString().padStart(decimals, '0');
-    return `${integerPart}.${paddedFractional.slice(0, 6)}`.replace(/\.?0+$/, '');
-  };
+  // Get token balances and prices
+  const tokenInBalance = balances.find(b => {
+    // For native SEI token
+    if (tokenIn === 'SEI' && b.token === 'native') {
+      return true;
+    }
+    // For other tokens, match by address
+    const tokenData = allTokens.find(t => t.symbol === tokenIn);
+    return tokenData && b.token === tokenData.address;
+  })?.amount || '0';
+  
+  const tokenOutBalance = balances.find(b => {
+    // For native SEI token
+    if (tokenOut === 'SEI' && b.token === 'native') {
+      return true;
+    }
+    // For other tokens, match by address
+    const tokenData = allTokens.find(t => t.symbol === tokenOut);
+    return tokenData && b.token === tokenData.address;
+  })?.amount || '0';
+  
+  // Get the decimals for proper formatting
+  const tokenInData = allTokens.find(t => t.symbol === tokenIn);
+  const tokenOutData = allTokens.find(t => t.symbol === tokenOut);
+  const tokenInDecimals = tokenInData?.address === 'native' ? 18 : 18; // Default to 18 for ERC20
+  const tokenOutDecimals = tokenOutData?.address === 'native' ? 18 : 18; // Default to 18 for ERC20
+  
+  // Format balances properly
+  const formattedTokenInBalance = formatFromDecimals(tokenInBalance, tokenInDecimals);
+  const formattedTokenOutBalance = formatFromDecimals(tokenOutBalance, tokenOutDecimals);
+  
+  // Look up prices by token address
+  const priceIn = tokenInData ? tokenPrices[tokenInData.address.toLowerCase()] || 0 : 0;
+  const priceOut = tokenOutData ? tokenPrices[tokenOutData.address.toLowerCase()] || 0 : 0;
+
+  // console.log('Token balances:', { tokenInBalance, tokenOutBalance });
+  // console.log('Formatted balances:', { formattedTokenInBalance, formattedTokenOutBalance });
+  // console.log('Token prices:', { 
+  //   tokenIn, 
+  //   tokenOut, 
+  //   priceIn, 
+  //   priceOut,
+  //   tokenPrices,
+  //   tokenInData: tokenInData?.address,
+  //   tokenOutData: tokenOutData?.address,
+  //   tokenInLower: tokenInData?.address?.toLowerCase(),
+  //   tokenOutLower: tokenOutData?.address?.toLowerCase()
+  // });
+  // console.log('Raw balance values:', { 
+  //   tokenInBalance, 
+  //   tokenOutBalance, 
+  //   tokenInBalanceType: typeof tokenInBalance,
+  //   tokenOutBalanceType: typeof tokenOutBalance 
+  // });
 
   return (
     <div className="max-w-5xl mx-auto mt-10 px-4">
@@ -163,6 +325,8 @@ export default function TradePage() {
         </motion.div>
       )}
 
+
+
       <div className="grid md:grid-cols-[1fr,380px] gap-8">
         {/* Main Swap Interface */}
         <motion.div
@@ -177,7 +341,7 @@ export default function TradePage() {
               Swap Tokens Magically ✨
             </h1>
             <p className="text-gray-300 text-sm">
-              Just choose your tokens, enter an amount, and click swap. It's that simple!
+              Just choose your tokens, enter an amount, and click swap. It&apos;s that simple!
             </p>
           </div>
 
@@ -187,7 +351,7 @@ export default function TradePage() {
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-gray-400">You Pay</span>
                 <span className="text-sm text-gray-400">
-                  Balance: {formatBalance(tokenInBalance)}
+                  Balance: {formattedTokenInBalance}
                 </span>
               </div>
               <div className="flex gap-4">
@@ -201,7 +365,7 @@ export default function TradePage() {
                 <TokenSelector
                   value={tokenIn}
                   onChange={setTokenIn}
-                  tokens={protocolTokens}
+                  tokens={allTokens}
                   className="min-w-[120px]"
                 />
               </div>
@@ -228,17 +392,17 @@ export default function TradePage() {
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-gray-400">You Receive</span>
                 <span className="text-sm text-gray-400">
-                  Balance: {formatBalance(tokenOutBalance)}
+                  Balance: {formattedTokenOutBalance}
                 </span>
               </div>
               <div className="flex gap-4">
                 <div className="flex-1 text-2xl font-medium text-gray-400">
-                  {amount ? (parseFloat(amount) * (priceIn / priceOut)).toFixed(6) : '0.0'}
+                  {amount ? calculateReceiveAmount(amount, priceIn, priceOut) : '0.0'}
                 </div>
                 <TokenSelector
                   value={tokenOut}
                   onChange={setTokenOut}
-                  tokens={protocolTokens}
+                  tokens={allTokens}
                   className="min-w-[120px]"
                 />
               </div>
@@ -251,16 +415,16 @@ export default function TradePage() {
           {/* Swap Button */}
           <button
             onClick={handleTrade}
-            disabled={!wagmiIsConnected || !amount || loading}
+            disabled={!wagmiIsConnected || !amount || isLoading}
             className={`w-full mt-6 py-4 rounded-xl text-lg font-semibold transition-all
-              ${!wagmiIsConnected || !amount || loading
+              ${!wagmiIsConnected || !amount || isLoading
                 ? 'bg-purple-900/50 text-gray-400 cursor-not-allowed'
                 : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white'
               }`}
           >
             {!wagmiIsConnected
               ? 'Connect Wallet'
-              : loading
+              : isLoading
               ? 'Swapping... ✨'
               : 'Swap Now 🪄'}
           </button>
@@ -293,33 +457,30 @@ export default function TradePage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center text-gray-400 py-4">
-                No tokens found in your wallet yet
+              <div className="text-center py-8">
+                <SparklesIcon className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+                <p className="text-gray-400">No tokens found</p>
+                <p className="text-sm text-gray-500 mt-2">Connect your wallet to see your tokens</p>
               </div>
             )}
           </div>
 
-          {/* Quick Tips */}
+          {/* Quick Actions */}
           <div className="p-6 rounded-xl bg-gradient-to-b from-blue-900/40 to-purple-900/40 border border-blue-500/30">
-            <h2 className="text-lg font-semibold mb-4">Quick Tips 💡</h2>
-            <ul className="space-y-3 text-sm text-gray-300">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400">•</span>
-                You can swap any token for any other token
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400">•</span>
-                Make sure to leave some tokens for gas fees
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-400">•</span>
-                The swap price includes a small 0.3% fee
-              </li>
-            </ul>
+            <h2 className="text-lg font-semibold mb-4">Quick Actions ⚡</h2>
+            <div className="space-y-3">
+              <button className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left">
+                <div className="font-medium">Add Liquidity</div>
+                <div className="text-sm text-gray-400">Earn fees by providing liquidity</div>
+              </button>
+              <button className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left">
+                <div className="font-medium">Stake Tokens</div>
+                <div className="text-sm text-gray-400">Earn rewards by staking</div>
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
     </div>
   );
-      
 }
