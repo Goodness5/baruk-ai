@@ -39,13 +39,13 @@ export default function TradePage() {
     ...protocolTokens
   ];
   
-  console.log('Available tokens:', allTokens);
-  console.log('Current balances:', balances);
-  console.log('Selected tokens:', { tokenIn, tokenOut });
-  console.log('Wallet connection state:', { 
-    wagmiIsConnected, 
-    address
-  });
+  // console.log('Available tokens:', allTokens);
+  // console.log('Current balances:', balances);
+  // console.log('Selected tokens:', { tokenIn, tokenOut });
+  // console.log('Wallet connection state:', { 
+  //   wagmiIsConnected, 
+  //   address
+  // });
 
 
 
@@ -194,6 +194,12 @@ export default function TradePage() {
 
       // Convert amount to wei (assuming 18 decimals for simplicity)
       const amountInWei = parseUnits(amount, 18);
+      console.log('Approval arguments:', { 
+        tokenInDataAddress: tokenInData.address, 
+        routerAddress: contractAddresses.router, 
+        amountInWei: amountInWei.toString(),
+        amountInWeiType: typeof amountInWei
+      });
 
       // First approve the router to spend tokens
       await wagmiCallTokenContract(
@@ -204,8 +210,8 @@ export default function TradePage() {
 
       // Then perform the swap
       await wagmiCallContract(
-        'swapExactTokensForTokens',
-        [amountInWei, 0, [tokenInData.address, tokenOutData.address], address, Math.floor(Date.now() / 1000) + 1200]
+        'swap',
+        [tokenInData.address, tokenOutData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
 
       toast.success('Swap completed successfully!');
@@ -285,25 +291,25 @@ export default function TradePage() {
   const priceIn = tokenInData ? tokenPrices[tokenInData.address.toLowerCase()] || 0 : 0;
   const priceOut = tokenOutData ? tokenPrices[tokenOutData.address.toLowerCase()] || 0 : 0;
 
-  console.log('Token balances:', { tokenInBalance, tokenOutBalance });
-  console.log('Formatted balances:', { formattedTokenInBalance, formattedTokenOutBalance });
-  console.log('Token prices:', { 
-    tokenIn, 
-    tokenOut, 
-    priceIn, 
-    priceOut,
-    tokenPrices,
-    tokenInData: tokenInData?.address,
-    tokenOutData: tokenOutData?.address,
-    tokenInLower: tokenInData?.address?.toLowerCase(),
-    tokenOutLower: tokenOutData?.address?.toLowerCase()
-  });
-  console.log('Raw balance values:', { 
-    tokenInBalance, 
-    tokenOutBalance, 
-    tokenInBalanceType: typeof tokenInBalance,
-    tokenOutBalanceType: typeof tokenOutBalance 
-  });
+  // console.log('Token balances:', { tokenInBalance, tokenOutBalance });
+  // console.log('Formatted balances:', { formattedTokenInBalance, formattedTokenOutBalance });
+  // console.log('Token prices:', { 
+  //   tokenIn, 
+  //   tokenOut, 
+  //   priceIn, 
+  //   priceOut,
+  //   tokenPrices,
+  //   tokenInData: tokenInData?.address,
+  //   tokenOutData: tokenOutData?.address,
+  //   tokenInLower: tokenInData?.address?.toLowerCase(),
+  //   tokenOutLower: tokenOutData?.address?.toLowerCase()
+  // });
+  // console.log('Raw balance values:', { 
+  //   tokenInBalance, 
+  //   tokenOutBalance, 
+  //   tokenInBalanceType: typeof tokenInBalance,
+  //   tokenOutBalanceType: typeof tokenOutBalance 
+  // });
 
   return (
     <div className="max-w-5xl mx-auto mt-10 px-4">
