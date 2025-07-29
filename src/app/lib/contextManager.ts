@@ -1,96 +1,96 @@
+interface TokenInfo {
+  address: string;
+  symbol: string;
+  name: string;
+  balance: string;
+  decimals: number;
+  priceUSD?: number;
+}
+
 interface WalletState {
   address: string | null;
-  type: 'external' | 'internal' | null;
-  status: 'connected' | 'disconnected' | 'pending';
+  type: "external" | "internal" | null;
+  status: "connected" | "disconnected" | "pending";
   privateKey?: string;
 }
 
 interface UserSession {
+  id: string;
   wallet: WalletState;
   riskTolerance: number;
-  investmentGoals: string[];
-  activeStrategies: any[];
-  portfolioHistory: any[];
-  preferences: {
-    autoCompound: boolean;
-    maxSlippage: string;
-    gasOptimization: boolean;
-    useInternalWallet: boolean;
-  };
   lastActivity: number;
+  activeStrategies: string[];
+  settings: {
+    defaultSlippage: number;
+    autoDeadline: boolean;
+  };
 }
 
-export class BarukContextManager {
-  private userSessions = new Map<string, UserSession>();
+class ContextManager {
+  private userSessions: Map<string, UserSession> = new Map();
 
   getUserSession(userId: string): UserSession {
     if (!this.userSessions.has(userId)) {
       this.userSessions.set(userId, {
+        id: userId,
         wallet: {
           address: null,
           type: null,
-          status: 'disconnected'
+          status: "disconnected",
         },
         riskTolerance: 5,
-        investmentGoals: [],
+        lastActivity: Date.now(),
         activeStrategies: [],
-        portfolioHistory: [],
-        preferences: {
-          autoCompound: true,
-          maxSlippage: "1.0",
-          gasOptimization: true,
-          useInternalWallet: false
+        settings: {
+          defaultSlippage: 1.0,
+          autoDeadline: true,
         },
-        lastActivity: Date.now()
       });
     }
     return this.userSessions.get(userId)!;
   }
 
-  async handleWalletConnection(userId: string, walletData: { address: string; type: 'external' | 'internal'; privateKey?: string }) {
+  async connectWallet(
+    userId: string,
+    address: string,
+    type: "external" | "internal"
+  ): Promise<boolean> {
     const session = this.getUserSession(userId);
     session.wallet = {
-      address: walletData.address,
-      type: walletData.type,
-      status: 'connected',
-      privateKey: walletData.privateKey
+      address,
+      type,
+      status: "connected",
     };
     session.lastActivity = Date.now();
-    this.userSessions.set(userId, session);
+    return true;
   }
 
-  disconnectWallet(userId: string) {
+  async autoConnectWallet(userId: string): Promise<boolean> {
+    const session = this.getUserSession(userId);
+    if (session.wallet.address && session.wallet.status === "disconnected") {
+      return this.connectWallet(userId, session.wallet.address, "external");
+    }
+    return session.wallet.status === "connected";
+  }
+
+  disconnectWallet(userId: string): void {
     const session = this.getUserSession(userId);
     session.wallet = {
       address: null,
       type: null,
-      status: 'disconnected'
+      status: "disconnected",
     };
-    session.lastActivity = Date.now();
-    this.userSessions.set(userId, session);
   }
 
-  updatePreferences(userId: string, preferences: Partial<{ 
-    autoCompound: boolean; 
-    maxSlippage: string; 
-    gasOptimization: boolean; 
-    useInternalWallet: boolean 
-  }>) {
+  updateSettings(
+    userId: string,
+    settings: Partial<UserSession["settings"]>
+  ): void {
     const session = this.getUserSession(userId);
-    session.preferences = { ...session.preferences, ...preferences };
-    session.lastActivity = Date.now();
-    this.userSessions.set(userId, session);
-  }
-
-  updateUserSession(userId: string, updates: Partial<UserSession>) {
-    const session = this.getUserSession(userId);
-    const updatedSession = { ...session, ...updates, lastActivity: Date.now() };
-    this.userSessions.set(userId, updatedSession);
-  }
-
-  canExecuteTransactions(userId: string): boolean {
-    const session = this.getUserSession(userId);
-    return session.wallet.status === 'connected' && 
-           (session.wallet.type === 'internal' || session.preferences.useInternalWallet);
+    session.settings = { ...session.settings, ...settings };
   }
 }
+
+// Export a singleton instance
+export const contextManager = new ContextManager();
+export type { UserSession, WalletState, TokenInfo };

@@ -7,8 +7,7 @@ import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
-import { useContractInteraction } from '../lib/contracts';
-import { useBarukContract } from '../lib/useBarukContract';
+import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
@@ -23,8 +22,7 @@ export default function TradePage() {
   const setBalances = useAppStore(s => s.setBalances);
   const setBalancesError = useAppStore(s => s.setBalancesError);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const { isConnected, type } = useContractInteraction();
-  const { callContract, callTokenContract } = useBarukContract('router');
+  const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
 
   const [tokenIn, setTokenIn] = useState('TOKEN0');
   const [tokenOut, setTokenOut] = useState('TOKEN1');
@@ -44,6 +42,12 @@ export default function TradePage() {
   console.log('Available tokens:', allTokens);
   console.log('Current balances:', balances);
   console.log('Selected tokens:', { tokenIn, tokenOut });
+  console.log('Wallet connection state:', { 
+    wagmiIsConnected, 
+    address
+  });
+
+
 
   // Helper function to format amounts considering decimals
   const formatFromDecimals = (amount: string, decimals: number) => {
@@ -81,6 +85,45 @@ export default function TradePage() {
     return (num * price).toFixed(2);
   };
 
+  // Helper function to calculate receive amount
+  const calculateReceiveAmount = (amount: string, priceIn: number, priceOut: number): string => {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) return '0.0';
+    
+    // If both prices are 0, we can't calculate a ratio
+    if (priceIn === 0 && priceOut === 0) {
+      // For now, assume 1:1 ratio for same token or show placeholder
+      if (tokenIn === tokenOut) {
+        return amountNum.toFixed(6);
+      } else {
+        // Try to use mock prices for test tokens
+        const mockPrices: Record<string, number> = {
+          'TOKEN0': 1.5,
+          'TOKEN1': 2.3,
+          'TOKEN2': 0.8,
+        };
+        const mockPriceIn = mockPrices[tokenIn] || 0;
+        const mockPriceOut = mockPrices[tokenOut] || 0;
+        
+        if (mockPriceIn > 0 && mockPriceOut > 0) {
+          const receiveAmount = amountNum * (mockPriceIn / mockPriceOut);
+          return receiveAmount.toFixed(6);
+        }
+        
+        return '0.0'; // No price data available
+      }
+    }
+    
+    // If one price is 0, we can't calculate
+    if (priceIn === 0 || priceOut === 0) {
+      return '0.0'; // No price data available
+    }
+    
+    // Calculate the receive amount based on price ratio
+    const receiveAmount = amountNum * (priceIn / priceOut);
+    return receiveAmount.toFixed(6);
+  };
+
   const formatBalance = (amount: string) => {
     console.log('formatBalance called with:', { amount, type: typeof amount });
     try {
@@ -106,6 +149,12 @@ export default function TradePage() {
   const handleTrade = async () => {
     if (!address || !wagmiIsConnected) {
       toast.error('Please connect your wallet first');
+      return;
+    }
+
+    // Check if wagmi wallet is connected
+    if (!wagmiIsConnected || !address) {
+      toast.error('Please connect your MetaMask wallet first');
       return;
     }
 
@@ -147,14 +196,14 @@ export default function TradePage() {
       const amountInWei = parseUnits(amount, 18);
 
       // First approve the router to spend tokens
-      await callTokenContract(
+      await wagmiCallTokenContract(
         tokenInData.address,
         'approve',
         [contractAddresses.router, amountInWei]
       );
 
       // Then perform the swap
-      await callContract(
+      await wagmiCallContract(
         'swapExactTokensForTokens',
         [amountInWei, 0, [tokenInData.address, tokenOutData.address], address, Math.floor(Date.now() / 1000) + 1200]
       );
@@ -170,6 +219,8 @@ export default function TradePage() {
       setIsLoading(false);
     }
   };
+
+
 
   // Fetch balances when wallet connects
   useEffect(() => {
@@ -230,11 +281,23 @@ export default function TradePage() {
   const formattedTokenInBalance = formatFromDecimals(tokenInBalance, tokenInDecimals);
   const formattedTokenOutBalance = formatFromDecimals(tokenOutBalance, tokenOutDecimals);
   
-  const priceIn = tokenPrices[tokenIn.toLowerCase()] || 0;
-  const priceOut = tokenPrices[tokenOut.toLowerCase()] || 0;
+  // Look up prices by token address
+  const priceIn = tokenInData ? tokenPrices[tokenInData.address.toLowerCase()] || 0 : 0;
+  const priceOut = tokenOutData ? tokenPrices[tokenOutData.address.toLowerCase()] || 0 : 0;
 
   console.log('Token balances:', { tokenInBalance, tokenOutBalance });
   console.log('Formatted balances:', { formattedTokenInBalance, formattedTokenOutBalance });
+  console.log('Token prices:', { 
+    tokenIn, 
+    tokenOut, 
+    priceIn, 
+    priceOut,
+    tokenPrices,
+    tokenInData: tokenInData?.address,
+    tokenOutData: tokenOutData?.address,
+    tokenInLower: tokenInData?.address?.toLowerCase(),
+    tokenOutLower: tokenOutData?.address?.toLowerCase()
+  });
   console.log('Raw balance values:', { 
     tokenInBalance, 
     tokenOutBalance, 
@@ -255,6 +318,8 @@ export default function TradePage() {
           <p className="text-gray-300">Connect your wallet to start swapping tokens with just a few clicks. No complicated forms, just magic! ✨</p>
         </motion.div>
       )}
+
+
 
       <div className="grid md:grid-cols-[1fr,380px] gap-8">
         {/* Main Swap Interface */}
@@ -326,7 +391,7 @@ export default function TradePage() {
               </div>
               <div className="flex gap-4">
                 <div className="flex-1 text-2xl font-medium text-gray-400">
-                  {amount ? (parseFloat(amount) * (priceIn / priceOut)).toFixed(6) : '0.0'}
+                  {amount ? calculateReceiveAmount(amount, priceIn, priceOut) : '0.0'}
                 </div>
                 <TokenSelector
                   value={tokenOut}

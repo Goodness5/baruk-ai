@@ -49,13 +49,18 @@ export function useUnifiedWallet(): UnifiedWalletState {
 
     try {
       if (window.ethereum && typeof window.ethereum.request === 'function') {
+        // Check if MetaMask is already connected
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
+        setAccounts(accounts);
+        
+        if (accounts.length === 0) {
+          // If no accounts are connected, request connection
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+        }
+        
         // Get current chain ID
         const currentChainId = await window.ethereum.request({ method: 'eth_chainId' }) as string;
         setChainId(currentChainId);
-
-        // Request all accounts
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
-        setAccounts(accounts);
 
         // Get the currently selected account
         const selectedAccounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
@@ -66,13 +71,6 @@ export function useUnifiedWallet(): UnifiedWalletState {
         if (!window.ethereum) throw new Error('window.ethereum is not available');
         const ethersProvider = new ethers.BrowserProvider(window.ethereum);
         const ethersSigner = await ethersProvider.getSigner();
-        
-        console.log('Connected to MetaMask:', {
-          address: currentAddress,
-          allAccounts: accounts,
-          currentIndex: currentIndex,
-          chainId: currentChainId
-        });
         
         setType('evm-external');
         setChain('evm');

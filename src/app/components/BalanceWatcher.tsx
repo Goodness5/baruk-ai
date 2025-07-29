@@ -13,6 +13,7 @@ export default function BalanceWatcher() {
   const setBalances = useAppStore(s => s.setBalances);
   const setBalancesLoading = useAppStore(s => s.setBalancesLoading);
   const setBalancesError = useAppStore(s => s.setBalancesError);
+  const setAddress = useAppStore(s => s.setAddress);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const { isConnected, address: wagmiAddress } = useAccount();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -85,6 +86,61 @@ export default function BalanceWatcher() {
       setBalancesLoading(false);
     }
   }, [currentAddress, isConnected, setBalances, setBalancesLoading, setBalancesError]);
+
+  // Synchronize wagmi address with app store and backend
+  useEffect(() => {
+    const syncWalletState = async () => {
+      if (wagmiAddress && wagmiAddress !== address) {
+        console.log('Syncing wagmi address to app store:', wagmiAddress);
+        setAddress(wagmiAddress);
+        
+        // Also sync with backend
+        try {
+          const response = await fetch('/api/wallet', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'connect',
+              userId: wagmiAddress,
+              address: wagmiAddress,
+              type: 'external'
+            }),
+          });
+          
+          if (response.ok) {
+            console.log('Backend wallet connection synchronized');
+          } else {
+            console.error('Failed to sync wallet with backend');
+          }
+        } catch (error) {
+          console.error('Error syncing wallet with backend:', error);
+        }
+      } else if (!wagmiAddress && address) {
+        console.log('Clearing app store address - wallet disconnected');
+        setAddress(null);
+        
+        // Also disconnect from backend
+        try {
+          await fetch('/api/wallet', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'disconnect',
+              userId: address
+            }),
+          });
+        } catch (error) {
+          console.error('Error disconnecting wallet from backend:', error);
+        }
+      }
+    };
+
+    syncWalletState();
+  }, [wagmiAddress, address, setAddress]);
 
   // Initial fetch
   useEffect(() => {
