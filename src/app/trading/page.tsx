@@ -15,11 +15,13 @@ import {
   BoltIcon,
   FireIcon,
   LightBulbIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline';
 import { useAccount } from 'wagmi';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../store/useAppStore';
+import TradingChart from '../components/TradingChart';
 
 // Trading Platform Types
 interface TradingPair {
@@ -49,13 +51,14 @@ interface AITradeSuggestion {
   leverage?: number;
 }
 
-interface TradingChart {
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
+interface CrossChainOpportunity {
+  fromChain: string;
+  toChain: string;
+  token: string;
+  priceDifference: number;
+  potentialProfit: number;
+  bridgeTime: string;
+  bridgeFee: number;
 }
 
 const THIRD_PARTY_PLATFORMS = [
@@ -76,7 +79,6 @@ export default function TradingPage() {
   const [tradingMode, setTradingMode] = useState<'SPOT' | 'FUTURES' | 'AI_AUTO'>('SPOT');
   const [selectedPlatform, setSelectedPlatform] = useState('BARUK');
   const [aiSuggestions, setAiSuggestions] = useState<AITradeSuggestion[]>([]);
-  const [chartData, setChartData] = useState<TradingChart[]>([]);
   const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiQuery, setAiQuery] = useState('');
@@ -84,6 +86,8 @@ export default function TradingPage() {
   const [todaysPnL, setTodaysPnL] = useState(0);
   const [activeOrders, setActiveOrders] = useState([]);
   const [marketSentiment, setMarketSentiment] = useState('BULLISH');
+  const [crossChainOpportunities, setCrossChainOpportunities] = useState<CrossChainOpportunity[]>([]);
+  const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
 
   // Mock Trading Pairs
   const tradingPairs: TradingPair[] = useMemo(() => [
@@ -108,58 +112,92 @@ export default function TradingPage() {
       low24h: 0.465
     },
     {
-      symbol: 'BTC/USDT',
-      baseAsset: 'BTC',
-      quoteAsset: 'USDT',
-      price: 43250.50,
-      change24h: 3.7,
-      volume24h: 890000000,
-      high24h: 44100.00,
-      low24h: 41850.00
+      symbol: 'TOKEN1/TOKEN2',
+      baseAsset: 'TOKEN1',
+      quoteAsset: 'TOKEN2',
+      price: 2.87,
+      change24h: 8.7,
+      volume24h: 890000,
+      high24h: 3.12,
+      low24h: 2.65
     },
     {
-      symbol: 'ETH/USDT',
-      baseAsset: 'ETH',
-      quoteAsset: 'USDT',
-      price: 2650.25,
-      change24h: 1.9,
-      volume24h: 450000000,
-      high24h: 2698.50,
-      low24h: 2580.00
+      symbol: 'TOKEN0/SEI',
+      baseAsset: 'TOKEN0',
+      quoteAsset: 'SEI',
+      price: 3.16,
+      change24h: 3.4,
+      volume24h: 650000,
+      high24h: 3.28,
+      low24h: 3.05
     }
   ], []);
 
-  // Generate Mock Chart Data
+  // Calculate portfolio value from balances
   useEffect(() => {
-    const generateChartData = () => {
-      const data: TradingChart[] = [];
-      let price = 1.500;
+    const calculatePortfolioValue = () => {
+      let totalValue = 0;
       
-      for (let i = 0; i < 100; i++) {
-        const timestamp = Date.now() - (99 - i) * 3600000; // Hourly data
-        const open = price;
-        const volatility = 0.02;
-        const change = (Math.random() - 0.5) * volatility;
-        price *= (1 + change);
-        const high = Math.max(open, price) * (1 + Math.random() * 0.01);
-        const low = Math.min(open, price) * (1 - Math.random() * 0.01);
-        const volume = Math.random() * 100000;
-        
-        data.push({
-          timestamp,
-          open,
-          high,
-          low,
-          close: price,
-          volume
-        });
-      }
+      balances.forEach(balance => {
+        const amount = parseFloat(balance.amount) / Math.pow(10, balance.decimals);
+        // Mock price calculation based on symbol
+        const mockPrices: Record<string, number> = {
+          'SEI': 0.487,
+          'TOKEN0': 1.543,
+          'TOKEN1': 2.87,
+          'TOKEN2': 0.95
+        };
+        const price = mockPrices[balance.symbol] || 1;
+        totalValue += amount * price;
+      });
       
-      setChartData(data);
+      setPortfolioValue(totalValue);
+      setTodaysPnL(totalValue * (Math.random() * 0.1 - 0.05)); // Random daily P&L
     };
     
-    generateChartData();
-  }, [selectedPair]);
+    calculatePortfolioValue();
+  }, [balances]);
+
+  // Generate cross-chain opportunities
+  useEffect(() => {
+    const generateCrossChainOpportunities = () => {
+      const opportunities: CrossChainOpportunity[] = [
+        {
+          fromChain: 'SEI',
+          toChain: 'Ethereum',
+          token: 'TOKEN0',
+          priceDifference: 3.2,
+          potentialProfit: 156.50,
+          bridgeTime: '15 min',
+          bridgeFee: 0.3
+        },
+        {
+          fromChain: 'SEI',
+          toChain: 'BSC',
+          token: 'TOKEN1',
+          priceDifference: 1.8,
+          potentialProfit: 89.20,
+          bridgeTime: '8 min',
+          bridgeFee: 0.15
+        },
+        {
+          fromChain: 'Ethereum',
+          toChain: 'SEI',
+          token: 'USDT',
+          priceDifference: 0.8,
+          potentialProfit: 45.30,
+          bridgeTime: '12 min',
+          bridgeFee: 0.25
+        }
+      ];
+      
+      setCrossChainOpportunities(opportunities);
+    };
+    
+    generateCrossChainOpportunities();
+    const interval = setInterval(generateCrossChainOpportunities, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Generate AI Suggestions
   const generateAISuggestions = async () => {
@@ -176,7 +214,7 @@ export default function TradingPage() {
           pair: 'TOKEN0/TOKEN1',
           action: 'BUY',
           confidence: 87,
-          reason: 'Strong bullish momentum detected. RSI shows oversold conditions with positive divergence.',
+          reason: 'Strong bullish momentum detected. Large whale accumulation observed with 12% price increase in 24h.',
           entryPrice: 1.543,
           targetPrice: 1.720,
           stopLoss: 1.450,
@@ -186,43 +224,28 @@ export default function TradingPage() {
         },
         {
           id: '2',
-          type: 'FUTURES',
-          pair: 'BTC/USDT',
+          type: 'ARBITRAGE',
+          pair: 'TOKEN1/TOKEN2',
           action: 'BUY',
-          confidence: 92,
-          reason: 'Bitcoin breaking above key resistance. Institutional buying increasing.',
-          entryPrice: 43250,
-          targetPrice: 46500,
-          stopLoss: 41800,
-          timeframe: '1d',
+          confidence: 94,
+          reason: 'Cross-chain arbitrage opportunity detected. Price difference of 8.7% between SEI and Ethereum networks.',
+          entryPrice: 2.87,
+          targetPrice: 3.12,
+          stopLoss: 2.75,
+          timeframe: '15m',
           riskLevel: 'LOW',
-          platform: 'BINANCE',
-          leverage: 3
+          platform: 'BINANCE'
         },
         {
           id: '3',
-          type: 'ARBITRAGE',
-          pair: 'SEI/USDT',
-          action: 'BUY',
-          confidence: 94,
-          reason: 'Price difference detected between Binance (0.487) and Coinbase (0.495). Risk-free profit opportunity.',
-          entryPrice: 0.487,
-          targetPrice: 0.495,
-          stopLoss: 0.485,
-          timeframe: '5m',
-          riskLevel: 'LOW',
-          platform: 'COINBASE'
-        },
-        {
-          id: '4',
           type: 'SWING',
-          pair: 'ETH/USDT',
+          pair: 'TOKEN0/SEI',
           action: 'SELL',
           confidence: 78,
-          reason: 'Ethereum showing signs of exhaustion near resistance. Volume declining.',
-          entryPrice: 2650,
-          targetPrice: 2480,
-          stopLoss: 2720,
+          reason: 'Technical indicators show overbought conditions. RSI above 70 with declining volume.',
+          entryPrice: 3.16,
+          targetPrice: 2.95,
+          stopLoss: 3.28,
           timeframe: '12h',
           riskLevel: 'HIGH',
           platform: 'KRAKEN'
@@ -282,7 +305,7 @@ export default function TradingPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Trading analysis: ${aiQuery}. Current portfolio: ${JSON.stringify(balances)}`,
+          message: `Trading analysis: ${aiQuery}. Current portfolio: ${JSON.stringify(balances)}. Selected pair: ${selectedPair}`,
           userId: address || 'anonymous',
         }),
       });
@@ -297,55 +320,9 @@ export default function TradingPage() {
     }
   };
 
-  // Simple Chart Component
-  const SimpleChart = ({ data }: { data: TradingChart[] }) => {
-    const maxPrice = Math.max(...data.map(d => d.high));
-    const minPrice = Math.min(...data.map(d => d.low));
-    const range = maxPrice - minPrice;
-    
-    return (
-      <div className="h-64 w-full bg-gradient-to-b from-purple-900/20 to-blue-900/20 rounded-lg p-4 relative overflow-hidden">
-        <svg className="w-full h-full">
-          <defs>
-            <linearGradient id="priceGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.1" />
-            </linearGradient>
-          </defs>
-          
-          {/* Price Line */}
-          <path
-            d={data.map((point, index) => {
-              const x = (index / (data.length - 1)) * 100;
-              const y = 100 - ((point.close - minPrice) / range) * 100;
-              return `${index === 0 ? 'M' : 'L'} ${x}% ${y}%`;
-            }).join(' ')}
-            stroke="#8B5CF6"
-            strokeWidth="2"
-            fill="none"
-            className="drop-shadow-sm"
-          />
-          
-          {/* Fill Area */}
-          <path
-            d={data.map((point, index) => {
-              const x = (index / (data.length - 1)) * 100;
-              const y = 100 - ((point.close - minPrice) / range) * 100;
-              return `${index === 0 ? 'M' : 'L'} ${x}% ${y}%`;
-            }).join(' ') + ' L 100% 100% L 0% 100% Z'}
-            fill="url(#priceGradient)"
-          />
-        </svg>
-        
-        {/* Price Labels */}
-        <div className="absolute top-2 left-2 text-xs text-purple-300">
-          ${maxPrice.toFixed(3)}
-        </div>
-        <div className="absolute bottom-2 left-2 text-xs text-purple-300">
-          ${minPrice.toFixed(3)}
-        </div>
-      </div>
-    );
+  const handlePriceSelect = (price: number) => {
+    setSelectedPrice(price);
+    toast.success(`Selected price: $${price.toFixed(4)} for your trade`);
   };
 
   return (
@@ -364,7 +341,7 @@ export default function TradingPage() {
             </h1>
           </div>
           <p className="text-gray-300 text-sm">
-            Advanced trading with AI assistance across multiple platforms 🚀
+            Advanced trading with real-time charts, order books, and cross-chain opportunities 🚀
           </p>
         </motion.div>
 
@@ -401,98 +378,83 @@ export default function TradingPage() {
           </div>
         </motion.div>
 
+        {/* Trading Mode Selector */}
+        <motion.div
+          className="flex gap-2 p-1 bg-gray-900/50 rounded-xl border border-gray-600/30 mb-6"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          {(['SPOT', 'FUTURES', 'AI_AUTO'] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setTradingMode(mode)}
+              className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                tradingMode === mode
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-gray-300 hover:bg-gray-700/50'
+              }`}
+            >
+              {mode === 'AI_AUTO' ? '🤖 AI Auto' : mode}
+            </button>
+          ))}
+        </motion.div>
+
+        {/* Pair Selector */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <select
+              value={selectedPair}
+              onChange={(e) => setSelectedPair(e.target.value)}
+              className="bg-gray-800/50 border border-gray-600/30 rounded-lg px-4 py-3 text-white text-lg focus:border-purple-400 focus:outline-none"
+            >
+              {tradingPairs.map(pair => (
+                <option key={pair.symbol} value={pair.symbol}>
+                  {pair.symbol} - ${pair.price.toFixed(3)} ({pair.change24h > 0 ? '+' : ''}{pair.change24h}%)
+                </option>
+              ))}
+            </select>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.open('https://www.tradingview.com', '_blank')}
+                className="px-4 py-2 bg-blue-600/30 hover:bg-blue-600/50 rounded-lg text-sm text-blue-300 transition-all"
+              >
+                📊 TradingView
+              </button>
+              <button
+                onClick={() => window.open('https://dexscreener.com', '_blank')}
+                className="px-4 py-2 bg-green-600/30 hover:bg-green-600/50 rounded-lg text-sm text-green-300 transition-all"
+              >
+                📈 DexScreener
+              </button>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Main Trading Chart */}
+        <motion.div
+          className="mb-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <TradingChart symbol={selectedPair} onPriceSelect={handlePriceSelect} />
+        </motion.div>
+
         <div className="grid lg:grid-cols-[2fr,1fr] gap-6">
-          {/* Main Trading Interface */}
+          {/* Platform Selector & Cross-Chain Opportunities */}
           <motion.div
             className="space-y-6"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.5 }}
           >
-            {/* Trading Mode Selector */}
-            <div className="flex gap-2 p-1 bg-gray-900/50 rounded-xl border border-gray-600/30">
-              {(['SPOT', 'FUTURES', 'AI_AUTO'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => setTradingMode(mode)}
-                  className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                    tradingMode === mode
-                      ? 'bg-purple-600 text-white shadow-lg'
-                      : 'text-gray-300 hover:bg-gray-700/50'
-                  }`}
-                >
-                  {mode === 'AI_AUTO' ? '🤖 AI Auto' : mode}
-                </button>
-              ))}
-            </div>
-
-            {/* Chart and Trading Panel */}
-            <div className="p-6 rounded-2xl bg-gradient-to-b from-gray-900/80 to-gray-800/80 border border-gray-600/30 backdrop-blur-sm">
-              {/* Pair Selector */}
-              <div className="flex items-center justify-between mb-4">
-                <select
-                  value={selectedPair}
-                  onChange={(e) => setSelectedPair(e.target.value)}
-                  className="bg-gray-800/50 border border-gray-600/30 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-400 focus:outline-none"
-                >
-                  {tradingPairs.map(pair => (
-                    <option key={pair.symbol} value={pair.symbol}>
-                      {pair.symbol} - ${pair.price.toFixed(3)} ({pair.change24h > 0 ? '+' : ''}{pair.change24h}%)
-                    </option>
-                  ))}
-                </select>
-                
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => window.open('https://www.tradingview.com', '_blank')}
-                    className="px-3 py-2 bg-blue-600/30 hover:bg-blue-600/50 rounded-lg text-xs text-blue-300 transition-all"
-                  >
-                    📊 TradingView
-                  </button>
-                  <button
-                    onClick={() => window.open('https://dexscreener.com', '_blank')}
-                    className="px-3 py-2 bg-green-600/30 hover:bg-green-600/50 rounded-lg text-xs text-green-300 transition-all"
-                  >
-                    📈 DexScreener
-                  </button>
-                </div>
-              </div>
-
-              {/* Chart */}
-              <SimpleChart data={chartData} />
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-4 gap-4 mt-4">
-                {(() => {
-                  const pair = tradingPairs.find(p => p.symbol === selectedPair);
-                  if (!pair) return null;
-                  
-                  return (
-                    <>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400">Price</div>
-                        <div className="font-bold text-white">${pair.price.toFixed(3)}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400">24h Change</div>
-                        <div className={`font-bold ${pair.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {pair.change24h >= 0 ? '+' : ''}{pair.change24h}%
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400">24h High</div>
-                        <div className="font-bold text-white">${pair.high24h.toFixed(3)}</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-xs text-gray-400">24h Low</div>
-                        <div className="font-bold text-white">${pair.low24h.toFixed(3)}</div>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
-
             {/* Platform Selector */}
             <div className="p-4 rounded-xl bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border border-indigo-400/40">
               <h3 className="text-sm font-bold text-indigo-300 mb-3">Trading Platforms</h3>
@@ -514,6 +476,54 @@ export default function TradingPage() {
                 ))}
               </div>
             </div>
+
+            {/* Cross-Chain Opportunities */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border border-cyan-400/40">
+              <div className="flex items-center gap-2 mb-3">
+                <GlobeAltIcon className="h-5 w-5 text-cyan-400" />
+                <h3 className="text-sm font-bold text-cyan-300">Cross-Chain Arbitrage</h3>
+              </div>
+              
+              <div className="space-y-3">
+                {crossChainOpportunities.map((opportunity, index) => (
+                  <motion.div
+                    key={index}
+                    className="p-3 rounded-lg bg-white/10 border border-cyan-400/20"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.1 }}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">{opportunity.token}</span>
+                        <span className="px-2 py-1 rounded text-xs bg-cyan-600/30 text-cyan-300">
+                          {opportunity.fromChain} → {opportunity.toChain}
+                        </span>
+                      </div>
+                      <div className="text-xs text-green-400 font-bold">
+                        +{opportunity.priceDifference.toFixed(1)}%
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                      <div>
+                        <span className="text-gray-400">Profit: </span>
+                        <span className="text-green-400">${opportunity.potentialProfit}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Time: </span>
+                        <span className="text-white">{opportunity.bridgeTime}</span>
+                      </div>
+                    </div>
+                    
+                    <button className="w-full py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-lg text-xs font-bold text-white transition-all">
+                      Execute Cross-Chain Trade
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
           </motion.div>
 
           {/* AI Assistant Panel */}
@@ -521,7 +531,7 @@ export default function TradingPage() {
             className="space-y-4"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.6 }}
           >
             {/* AI Suggestions */}
             <div className="p-4 rounded-xl bg-gradient-to-b from-purple-900/50 to-pink-900/50 border border-purple-400/40">
@@ -630,6 +640,13 @@ export default function TradingPage() {
                   💬 Get AI Insights
                 </button>
               </div>
+              
+              {selectedPrice && (
+                <div className="mt-3 p-2 rounded-lg bg-green-600/20 border border-green-400/30">
+                  <div className="text-xs text-green-300">Selected Price from Chart:</div>
+                  <div className="text-sm font-bold text-white">${selectedPrice.toFixed(4)}</div>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions */}
