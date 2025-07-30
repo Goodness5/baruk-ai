@@ -95,7 +95,7 @@ export default function NotFound() {
               >
                 <div className="text-2xl mb-2">🦍</div>
                 <p className="text-blue-300 text-sm">Even apes know this page doesn't exist!</p>
-              </div>
+              </motion.div>
             </div>
           </div>
 
