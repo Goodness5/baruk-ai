@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import { useState, useEffect } from 'react';
@@ -11,6 +12,8 @@ import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core'
+import { config } from '@/wagmi';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -202,17 +205,20 @@ export default function TradePage() {
       });
 
       // First approve the router to spend tokens
-      await wagmiCallTokenContract(
+      const approvalTx = await wagmiCallTokenContract(
         tokenInData.address,
         'approve',
         [contractAddresses.router, amountInWei]
       );
+      await waitForTransactionReceipt( config, { hash: approvalTx.hash });
 
       // Then perform the swap
-      await wagmiCallContract(
+      const swapTx = await wagmiCallContract(
         'swap',
         [tokenInData.address, tokenOutData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
+      console.log('Swap transaction:', swapTx);
+      await waitForTransactionReceipt(config, { hash: swapTx.hash });
 
       toast.success('Swap completed successfully!');
       
@@ -220,7 +226,8 @@ export default function TradePage() {
       setAmount('');
     } catch (error) {
       console.error('Swap error:', error);
-      toast.error('Swap failed. Please try again.');
+      const errorMessage = (error as any)?.message || 'An unknown error occurred';
+      toast.error(`Swap failed: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
