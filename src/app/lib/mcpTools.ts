@@ -343,4 +343,6 @@ export async function analyzeMemeCoinFlows(tokenAddress: string): Promise<FlowAn
     console.error('Error analyzing meme coin flows:', error);
     throw new Error(`Failed to analyze meme coin flows: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-} 
+}
+
+ 
