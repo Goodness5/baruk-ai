@@ -22,8 +22,8 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Swap', href: '/swap', icon: ArrowsRightLeftIcon },
+    { name: 'Exchange', href: '/swap', icon: ArrowsRightLeftIcon },
+    { name: 'Trading Hub', href: '/trading', icon: ChartBarIcon },
     { name: 'Liquidity', href: '/liquidity', icon: BeakerIcon },
     { name: 'Pools', href: '/pools', icon: BanknotesIcon },
     { name: 'Lending', href: '/lending', icon: CurrencyDollarIcon },
@@ -35,7 +35,7 @@ export default function Sidebar() {
 
   return (
     <aside className="flex md:flex-col w-full md:w-56 bg-gradient-to-b from-[#3a1c4a] via-[#2d193c] to-[#1e2e2e] p-4 md:p-6 space-y-4 shadow-lg">
-      
+
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-2xl font-bold tracking-tight bg-gradient-to-r from-green-400 via-purple-400 to-purple-700 bg-clip-text text-transparent">
           Baruk DeFi
@@ -45,7 +45,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      
+
       <nav className="flex flex-col gap-2">
         {navigation.map((item, index) => {
             const isActive = pathname === item.href;
