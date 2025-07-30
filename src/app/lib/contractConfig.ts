@@ -9,6 +9,7 @@ import ERC20ABI from '../../abi/ERC20.json';
 // Contract addresses from BARUK_CONTRACTS
 export const contractAddresses = {
   ammFactory: '0xCEeC70dF7bC3aEB57F078A1b1BeEa2c6320d8957',
+  amm: '0x7FE1358Fd97946fCC8f07eb18331aC8Bfe37b7B1',
   router: '0xe605be74ba68fc255dB0156ab63c31b50b336D6B',
   lending: '0x5197d95B4336f1EF6dd0fd62180101021A88E27b',
   limitOrder: '0x3bDdc3fAbf58fDaA6fF62c95b944819cF625c0F4',

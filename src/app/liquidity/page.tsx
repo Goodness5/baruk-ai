@@ -133,21 +133,21 @@ export default function LiquidityPage() {
       const approvalTxA = await wagmiCallTokenContract(
         tokenAData.address,
         'approve',
-        [contractAddresses.amm, amountAInWei]
+        [contractAddresses.amm as `0x${string}`, amountAInWei]
       );
       await waitForTransactionReceipt(config, { hash: approvalTxA.hash });
 
       const approvalTxB = await wagmiCallTokenContract(
         tokenBData.address,
         'approve',
-        [contractAddresses.amm, amountBInWei]
+        [contractAddresses.amm as `0x${string}`, amountBInWei]
       );
       await waitForTransactionReceipt(config, { hash: approvalTxB.hash });
 
       // Add liquidity using the AMM contract
       const addLiquidityTx = await wagmiCallContract(
         'addLiquidity',
-        [amountAInWei, amountBInWei, address]
+        [amountAInWei, amountBInWei, address as `0x${string}`]
       );
       console.log('Add liquidity transaction:', addLiquidityTx);
       await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash });
