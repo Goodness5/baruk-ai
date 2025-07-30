@@ -1,8 +1,18 @@
 
 "use client";
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { SparklesIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  SparklesIcon, 
+  PlusIcon,
+  MinusIcon,
+  CurrencyDollarIcon,
+  ChartBarIcon,
+  FireIcon,
+  BoltIcon,
+  ArrowTrendingUpIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
@@ -13,39 +23,66 @@ import { parseUnits, formatUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { config } from '@/wagmi';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import TrendingTokens from '../components/TrendingTokens';
+import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function LiquidityPage() {
-  const { address, isConnected: wagmiIsConnected } = useAccount();
+  const { address, isConnected: walletConnected } = useAccount();
   const balances = useAppStore(s => s.balances);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const tokenPricesLoading = useAppStore(s => s.tokenPricesLoading);
   const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('amm');
   
-  const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
+  // Pool and earning data
+  const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
+  const { liquidityBalance, lpRewards } = useUserAMMData(address);
+
+  const [activeTab, setActiveTab] = useState<'add' | 'remove' | 'positions'>('add');
   const [tokenA, setTokenA] = useState('TOKEN0');
   const [tokenB, setTokenB] = useState('TOKEN1');
   const [amountA, setAmountA] = useState('');
   const [amountB, setAmountB] = useState('');
-  const [liquidityAmount, setLiquidityAmount] = useState('');
+  const [removeAmount, setRemoveAmount] = useState('');
+  const [removePercentage, setRemovePercentage] = useState(25);
   const [loading, setLoading] = useState(false);
-  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [aiQuery, setAiQuery] = useState('');
+  const [aiSuggestion, setAiSuggestion] = useState('');
 
-  // Get protocol and tokens
-  const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
-  const protocolTokens = getProtocolTokens(protocolId);
+  // Get protocol and assets
+  const protocol = getSeiProtocolById(DEFAULT_PROTOCOL_ID) as SeiProtocol;
+  const protocolAssets = getProtocolTokens(DEFAULT_PROTOCOL_ID);
   
-  // Add SEI as a native token option
-  const allTokens = [
-    { symbol: 'SEI', address: 'native' },
-    ...protocolTokens
+  const allAssets = [
+    { symbol: 'SEI', address: 'native', name: 'Sei Money' },
+    ...protocolAssets.map(asset => ({ ...asset, name: asset.symbol }))
   ];
 
-  // Helper function to format amounts considering decimals
+  // Mock position data - replace with real data
+  const userPositions = [
+    {
+      id: 1,
+      tokenA: 'TOKEN0',
+      tokenB: 'TOKEN1',
+      liquidity: '1250.50',
+      value: '$2,890.45',
+      apy: '15.2%',
+      rewards: '45.2',
+      fees24h: '12.80'
+    },
+    {
+      id: 2,
+      tokenA: 'SEI',
+      tokenB: 'TOKEN2',
+      liquidity: '890.25',
+      value: '$1,456.78',
+      apy: '22.8%',
+      rewards: '23.1',
+      fees24h: '8.95'
+    }
+  ];
+
+  // Helper functions
   const formatFromDecimals = (amount: string, decimals: number) => {
     try {
       const value = BigInt(amount);
@@ -65,7 +102,7 @@ export default function LiquidityPage() {
       
       return trimmed;
     } catch (error) {
-      console.error('Error formatting decimals:', error);
+      console.error('Error formatting amount:', error);
       return '0';
     }
   };
@@ -89,50 +126,55 @@ export default function LiquidityPage() {
       
       return num.toFixed(4);
     } catch (error) {
-      console.error('Error formatting balance:', error);
+      return '0';
+    }
+  };
+
+  const calculateRemoveAmount = () => {
+    if (!liquidityBalance) return '0';
+    try {
+      const balance = Number(formatUnits(liquidityBalance, 18));
+      return ((balance * removePercentage) / 100).toFixed(6);
+    } catch {
       return '0';
     }
   };
 
   const handleAddLiquidity = async () => {
-    if (!address || !wagmiIsConnected) {
-      toast.error('Please connect your wallet first');
+    if (!address || !walletConnected) {
+      toast.error('Please connect your digital wallet first! 🔗');
       return;
     }
 
     if (!amountA || !amountB || parseFloat(amountA) <= 0 || parseFloat(amountB) <= 0) {
-      toast.error('Please enter valid amounts for both tokens');
+      toast.error('Please enter valid amounts for both assets! 💰');
       return;
     }
 
     if (tokenA === tokenB) {
-      toast.error('Cannot add liquidity with the same token');
+      toast.error('Cannot provide liquidity with the same asset! 🔄');
       return;
     }
 
     setLoading(true);
     try {
-      // Find token addresses
-      const tokenAData = allTokens.find(t => t.symbol === tokenA);
-      const tokenBData = allTokens.find(t => t.symbol === tokenB);
+      const tokenAData = allAssets.find(t => t.symbol === tokenA);
+      const tokenBData = allAssets.find(t => t.symbol === tokenB);
 
       if (!tokenAData || !tokenBData) {
-        toast.error('Token not found');
-        return;
+        throw new Error('Asset not found');
       }
 
-      // Handle native SEI token
       if (tokenAData.address === 'native' || tokenBData.address === 'native') {
-        toast.error('Native SEI liquidity not yet implemented');
-        setLoading(false);
-        return;
+        throw new Error('SEI money liquidity coming soon! ⭐');
       }
 
-      // Convert amounts to wei (assuming 18 decimals)
       const amountAInWei = parseUnits(amountA, 18);
       const amountBInWei = parseUnits(amountB, 18);
 
-      // First approve both tokens
+      // Approve tokens
+      toast.loading('Setting up your liquidity provision... ⚡', { id: 'liquidity' });
+      
       const approvalTxA = await wagmiCallTokenContract(
         tokenAData.address,
         'approve',
@@ -147,411 +189,601 @@ export default function LiquidityPage() {
       );
       await waitForTransactionReceipt(config, { hash: approvalTxB.hash });
 
-      // Add liquidity using the AMM contract
+      // Add liquidity
+      toast.loading('Creating your liquidity position... ✨', { id: 'liquidity' });
       const addLiquidityTx = await wagmiCallContract(
         'addLiquidity',
         [amountAInWei, amountBInWei, address as `0x${string}`]
       );
-      console.log('Add liquidity transaction:', addLiquidityTx);
       await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash });
 
-      toast.success('Liquidity added successfully! ✨');
+      toast.success('🎉 Liquidity added successfully! You\'re now earning fees!', { id: 'liquidity' });
       
-      // Reset form
       setAmountA('');
       setAmountB('');
+      setActiveTab('positions');
     } catch (error) {
       console.error('Add liquidity error:', error);
-      const errorMessage = (error as any)?.message || 'An unknown error occurred';
-      toast.error(`Failed to add liquidity: ${errorMessage}`);
+      const errorMessage = (error as any)?.message || 'Something went wrong';
+      toast.error(`Failed to add liquidity: ${errorMessage}`, { id: 'liquidity' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleRemoveLiquidity = async () => {
-    if (!address || !wagmiIsConnected) {
-      toast.error('Please connect your wallet first');
+    if (!address || !walletConnected) {
+      toast.error('Please connect your digital wallet first! 🔗');
       return;
     }
 
-    if (!liquidityAmount || parseFloat(liquidityAmount) <= 0) {
-      toast.error('Please enter a valid liquidity amount');
+    const calculatedAmount = calculateRemoveAmount();
+    if (!calculatedAmount || parseFloat(calculatedAmount) <= 0) {
+      toast.error('Please select an amount to remove! 💰');
       return;
     }
 
     setLoading(true);
     try {
-      // Convert liquidity amount to wei (assuming 18 decimals)
-      const liquidityInWei = parseUnits(liquidityAmount, 18);
-
-      // Remove liquidity using the AMM contract
+      toast.loading('Removing your liquidity... 🔥', { id: 'remove' });
+      
+      const liquidityInWei = parseUnits(calculatedAmount, 18);
       const removeLiquidityTx = await wagmiCallContract(
         'removeLiquidity',
         [liquidityInWei]
       );
-      console.log('Remove liquidity transaction:', removeLiquidityTx);
       await waitForTransactionReceipt(config, { hash: removeLiquidityTx.hash });
 
-      toast.success('Liquidity removed successfully! 🔄');
-      
-      // Reset form
-      setLiquidityAmount('');
+      toast.success('✅ Liquidity removed successfully!', { id: 'remove' });
+      setRemovePercentage(25);
     } catch (error) {
       console.error('Remove liquidity error:', error);
-      const errorMessage = (error as any)?.message || 'An unknown error occurred';
-      toast.error(`Failed to remove liquidity: ${errorMessage}`);
+      const errorMessage = (error as any)?.message || 'Something went wrong';
+      toast.error(`Failed to remove liquidity: ${errorMessage}`, { id: 'remove' });
     } finally {
       setLoading(false);
     }
   };
 
-  // Get token balances and prices
-  const tokenABalance = balances.find(b => {
-    if (tokenA === 'SEI' && b.token === 'native') {
-      return true;
-    }
-    const tokenData = allTokens.find(t => t.symbol === tokenA);
-    return tokenData && b.token === tokenData.address;
-  })?.amount || '0';
-  
-  const tokenBBalance = balances.find(b => {
-    if (tokenB === 'SEI' && b.token === 'native') {
-      return true;
-    }
-    const tokenData = allTokens.find(t => t.symbol === tokenB);
-    return tokenData && b.token === tokenData.address;
-  })?.amount || '0';
-
-  // Get the decimals for proper formatting
-  const tokenAData = allTokens.find(t => t.symbol === tokenA);
-  const tokenBData = allTokens.find(t => t.symbol === tokenB);
-  const tokenADecimals = tokenAData?.address === 'native' ? 18 : 18;
-  const tokenBDecimals = tokenBData?.address === 'native' ? 18 : 18;
-  
-  // Format balances properly
-  const formattedTokenABalance = formatFromDecimals(tokenABalance, tokenADecimals);
-  const formattedTokenBBalance = formatFromDecimals(tokenBBalance, tokenBDecimals);
-  
-  // Look up prices by token address
-  const priceA = tokenAData ? tokenPrices[tokenAData.address.toLowerCase()] || 0 : 0;
-  const priceB = tokenBData ? tokenPrices[tokenBData.address.toLowerCase()] || 0 : 0;
-
   const handleAIQuery = async () => {
     if (!aiQuery.trim()) return;
     
     try {
+      setAiSuggestion('Analyzing optimal liquidity strategies... 🤖');
+      
       const response = await fetch('/api/baruk-chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: aiQuery,
+          message: `Liquidity advice: ${aiQuery}. Current positions: ${JSON.stringify(userPositions)}`,
+          userId: address || 'anonymous',
           walletAddress: address,
         }),
       });
       
+      if (!response.ok) {
+        throw new Error('AI assistant is taking a break');
+      }
+      
       const data = await response.json();
-      console.log('AI Response:', data);
-      toast.success('AI query processed! Check console for response.');
+      setAiSuggestion(data.text || 'Based on current market conditions, consider diversifying your liquidity across multiple pools for optimal returns! 🚀');
+      toast.success('✨ AI analysis complete!');
       setAiQuery('');
-      setShowAIDialog(false);
     } catch (error) {
       console.error('AI query error:', error);
-      toast.error('Failed to process AI query');
+      setAiSuggestion('AI assistant is temporarily unavailable. Try providing liquidity to high-APY pools! 💡');
+      toast.error('AI assistant error, but showing general advice!');
     }
   };
 
-  const chartData = [
-    { date: '2024-07-01', tvl: 10000 },
-    { date: '2024-07-02', tvl: 12000 },
-    { date: '2024-07-03', tvl: 15000 },
-    { date: '2024-07-04', tvl: 13000 },
-    { date: '2024-07-05', tvl: 17000 },
-  ];
+  // Get token balances
+  const tokenABalance = balances.find(b => {
+    if (tokenA === 'SEI' && b.token === 'native') return true;
+    const assetData = allAssets.find(c => c.symbol === tokenA);
+    return assetData && b.token === assetData.address;
+  })?.amount || '0';
+  
+  const tokenBBalance = balances.find(b => {
+    if (tokenB === 'SEI' && b.token === 'native') return true;
+    const assetData = allAssets.find(c => c.symbol === tokenB);
+    return assetData && b.token === assetData.address;
+  })?.amount || '0';
+
+  const tokenAData = allAssets.find(c => c.symbol === tokenA);
+  const tokenBData = allAssets.find(c => c.symbol === tokenB);
+  const tokenADecimals = tokenAData?.address === 'native' ? 18 : 18;
+  const tokenBDecimals = tokenBData?.address === 'native' ? 18 : 18;
+  
+  const formattedTokenABalance = formatFromDecimals(tokenABalance, tokenADecimals);
+  const formattedTokenBBalance = formatFromDecimals(tokenBBalance, tokenBDecimals);
+  
+  const priceA = tokenAData ? tokenPrices[tokenAData.address.toLowerCase()] || 0 : 0;
+  const priceB = tokenBData ? tokenPrices[tokenBData.address.toLowerCase()] || 0 : 0;
+
+  const formatEarningsValue = (value: bigint | undefined) => {
+    if (!value) return '0';
+    try {
+      return formatUnits(value, 18);
+    } catch {
+      return '0';
+    }
+  };
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 px-4">
-      {/* Welcome Message for New Users */}
-      {!address && (
-        <motion.div 
-          className="mb-8 p-6 rounded-xl bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <h2 className="text-2xl font-bold text-white mb-3">💰 Welcome to Baruk Liquidity!</h2>
-          <p className="text-gray-300">Connect your wallet to start providing liquidity and earning fees from trades! 🚀</p>
-        </motion.div>
-      )}
+    <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-pink-900/20">
+      <div className="max-w-7xl mx-auto p-4 lg:p-6">
+        {/* Welcome Message for New Users */}
+        {!address && (
+          <motion.div 
+            className="mb-6 p-4 rounded-xl bg-gradient-to-r from-purple-900/60 to-blue-900/60 border border-purple-400/40 text-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-3xl mb-2">💧</div>
+            <h1 className="text-2xl font-bold text-white mb-2">Welcome to Liquidity Pools!</h1>
+            <p className="text-gray-300">
+              Provide liquidity to earn fees from every trade. Connect your wallet to start earning! 🚀
+            </p>
+          </motion.div>
+        )}
 
-      <div className="grid md:grid-cols-[1fr,380px] gap-8">
-        {/* Main Liquidity Interface */}
-        <motion.div
-          className="space-y-8"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          {/* Add Liquidity Section */}
-          <div className="p-8 rounded-2xl bg-gradient-to-b from-purple-900/40 to-blue-900/40 border border-purple-500/30 backdrop-blur-sm shadow-xl">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                Add Liquidity 💧
-              </h2>
-              <p className="text-gray-300 text-sm">
-                Provide tokens to earn fees from trades in this pool.
-              </p>
+        <div className="grid lg:grid-cols-[2fr,1fr] gap-6">
+          {/* Main Liquidity Interface */}
+          <motion.div
+            className="space-y-6"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            {/* Tab Navigation */}
+            <div className="flex space-x-1 p-1 bg-purple-900/40 rounded-xl">
+              {[
+                { key: 'add', label: 'Add Liquidity', icon: PlusIcon },
+                { key: 'remove', label: 'Remove Liquidity', icon: MinusIcon },
+                { key: 'positions', label: 'My Positions', icon: ChartBarIcon }
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key as any)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all
+                    ${activeTab === tab.key 
+                      ? 'bg-purple-600 text-white shadow-lg' 
+                      : 'text-purple-300 hover:text-white hover:bg-purple-800/50'
+                    }`}
+                >
+                  <tab.icon className="h-4 w-4" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
             </div>
 
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <div className="p-4 rounded-xl bg-white/5 border border-purple-500/20">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm text-gray-400">Token A</span>
-                      <span className="text-sm text-gray-400">
-                        Balance: {formattedTokenABalance}
-                      </span>
-                    </div>
-                    <div className="flex gap-4">
-                      <input
-                        type="number"
-                        value={amountA}
-                        onChange={e => setAmountA(e.target.value)}
-                        placeholder="0.0"
-                        className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
-                      />
-                      <TokenSelector
-                        value={tokenA}
-                        onChange={setTokenA}
-                        tokens={allTokens}
-                        className="min-w-[120px]"
-                      />
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      ≈ ${getUSDValue(amountA, priceA)}
-                    </div>
+            {/* Tab Content */}
+            <AnimatePresence mode="wait">
+              {activeTab === 'add' && (
+                <motion.div
+                  key="add"
+                  className="p-6 rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                >
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                      💧 Add Liquidity
+                    </h2>
+                    <p className="text-gray-300 text-sm">
+                      Provide assets to earn fees from trades. You'll receive liquidity tokens representing your share.
+                    </p>
                   </div>
-                </div>
 
-                <div className="flex items-center">
-                  <span className="text-purple-400 font-bold text-xl">+</span>
-                </div>
-
-                <div className="flex-1">
-                  <div className="p-4 rounded-xl bg-white/5 border border-purple-500/20">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm text-gray-400">Token B</span>
-                      <span className="text-sm text-gray-400">
-                        Balance: {formattedTokenBBalance}
-                      </span>
-                    </div>
-                    <div className="flex gap-4">
-                      <input
-                        type="number"
-                        value={amountB}
-                        onChange={e => setAmountB(e.target.value)}
-                        placeholder="0.0"
-                        className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
-                      />
-                      <TokenSelector
-                        value={tokenB}
-                        onChange={setTokenB}
-                        tokens={allTokens}
-                        className="min-w-[120px]"
-                      />
-                    </div>
-                    <div className="mt-1 text-sm text-gray-500">
-                      ≈ ${getUSDValue(amountB, priceB)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleAddLiquidity}
-                disabled={!wagmiIsConnected || !amountA || !amountB || loading}
-                className={`w-full py-4 rounded-xl text-lg font-semibold transition-all
-                  ${!wagmiIsConnected || !amountA || !amountB || loading
-                    ? 'bg-purple-900/50 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white'
-                  }`}
-              >
-                {!wagmiIsConnected
-                  ? 'Connect Wallet'
-                  : loading
-                  ? 'Adding Liquidity... ✨'
-                  : 'Add Liquidity 💧'}
-              </button>
-            </div>
-          </div>
-
-          {/* Remove Liquidity Section */}
-          <div className="p-8 rounded-2xl bg-gradient-to-b from-red-900/40 to-orange-900/40 border border-red-500/30 backdrop-blur-sm shadow-xl">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
-                Remove Liquidity 🔥
-              </h2>
-              <p className="text-gray-300 text-sm">
-                Remove your liquidity tokens to get back your underlying assets.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-white/5 border border-red-500/20">
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm text-gray-400">Liquidity Amount</span>
-                  <span className="text-sm text-gray-400">
-                    Your LP Tokens: {/* TODO: Get actual LP balance */}
-                  </span>
-                </div>
-                <input
-                  type="number"
-                  value={liquidityAmount}
-                  onChange={e => setLiquidityAmount(e.target.value)}
-                  placeholder="0.0"
-                  className="w-full bg-transparent text-2xl font-medium focus:outline-none"
-                />
-              </div>
-
-              <button
-                onClick={handleRemoveLiquidity}
-                disabled={!wagmiIsConnected || !liquidityAmount || loading}
-                className={`w-full py-4 rounded-xl text-lg font-semibold transition-all
-                  ${!wagmiIsConnected || !liquidityAmount || loading
-                    ? 'bg-red-900/50 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white'
-                  }`}
-              >
-                {!wagmiIsConnected
-                  ? 'Connect Wallet'
-                  : loading
-                  ? 'Removing Liquidity... 🔥'
-                  : 'Remove Liquidity 🔥'}
-              </button>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Sidebar */}
-        <motion.div
-          className="space-y-6"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          {/* Pool Stats */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-purple-900/40 to-blue-900/40 border border-purple-500/30">
-            <h3 className="text-lg font-semibold mb-4">Pool Statistics 📊</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total Value Locked</span>
-                <span className="text-white font-semibold">$12.5M</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">24h Volume</span>
-                <span className="text-white font-semibold">$850K</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">APR</span>
-                <span className="text-green-400 font-semibold">15.2%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Your Share</span>
-                <span className="text-white font-semibold">0.00%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* TVL Chart */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-blue-900/40 to-purple-900/40 border border-blue-500/30">
-            <h3 className="text-lg font-semibold mb-4">TVL Trend 📈</h3>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorTvl" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0.2}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" stroke="#22d3ee"/>
-                  <YAxis stroke="#a855f7"/>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#4b5563"/>
-                  <Tooltip contentStyle={{ background: '#0a0a0a', border: 'none', color: '#fff' }}/>
-                  <Area type="monotone" dataKey="tvl" stroke="#22d3ee" fillOpacity={1} fill="url(#colorTvl)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* AI Agent Integration */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-pink-900/40 to-purple-900/40 border border-pink-500/30">
-            <h3 className="text-lg font-semibold mb-4">AI Liquidity Assistant 🤖</h3>
-            <div className="space-y-3">
-              <button 
-                onClick={() => setShowAIDialog(!showAIDialog)}
-                className="w-full p-3 rounded-lg bg-pink-600/20 hover:bg-pink-600/30 transition-colors text-left"
-              >
-                <div className="font-medium">Ask AI Agent</div>
-                <div className="text-sm text-gray-400">Get liquidity insights & strategies</div>
-              </button>
-              
-              {showAIDialog && (
-                <div className="space-y-3">
-                  <textarea
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    placeholder="Ask about optimal liquidity ratios, impermanent loss, or yield strategies..."
-                    className="w-full p-3 rounded-lg bg-white/5 border border-pink-500/20 text-white placeholder-gray-400 resize-none"
-                    rows={3}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAIQuery}
-                      disabled={!aiQuery.trim()}
-                      className="flex-1 py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-colors text-sm font-medium"
+                  <div className="space-y-4">
+                    {/* Token A Input */}
+                    <motion.div 
+                      className="p-4 rounded-xl bg-white/10 border border-purple-400/30"
+                      whileHover={{ scale: 1.01 }}
+                      transition={{ duration: 0.2 }}
                     >
-                      Ask AI
-                    </button>
-                    <button
-                      onClick={() => setShowAIDialog(false)}
-                      className="py-2 px-4 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-colors text-sm"
+                      <div className="flex justify-between mb-2 text-sm">
+                        <span className="text-gray-300 font-medium">First Asset</span>
+                        <span className="text-gray-300">Available: {formatBalance(formattedTokenABalance)}</span>
+                      </div>
+                      <div className="flex gap-3 items-center">
+                        <input
+                          type="number"
+                          value={amountA}
+                          onChange={e => setAmountA(e.target.value)}
+                          placeholder="0.0"
+                          className="flex-1 bg-transparent text-xl font-bold focus:outline-none text-white placeholder-gray-500"
+                        />
+                        <TokenSelector
+                          value={tokenA}
+                          onChange={setTokenA}
+                          tokens={allAssets}
+                          className="min-w-[120px] bg-purple-600/30 hover:bg-purple-600/50"
+                        />
+                      </div>
+                      <div className="mt-1 text-sm text-purple-300">
+                        ≈ ${getUSDValue(amountA, priceA)}
+                      </div>
+                    </motion.div>
+
+                    <div className="flex justify-center">
+                      <div className="p-2 rounded-full bg-gradient-to-r from-purple-600/40 to-pink-600/40 border border-purple-400/30">
+                        <PlusIcon className="h-4 w-4 text-purple-300" />
+                      </div>
+                    </div>
+
+                    {/* Token B Input */}
+                    <motion.div 
+                      className="p-4 rounded-xl bg-white/10 border border-blue-400/30"
+                      whileHover={{ scale: 1.01 }}
+                      transition={{ duration: 0.2 }}
                     >
-                      Cancel
-                    </button>
+                      <div className="flex justify-between mb-2 text-sm">
+                        <span className="text-gray-300 font-medium">Second Asset</span>
+                        <span className="text-gray-300">Available: {formatBalance(formattedTokenBBalance)}</span>
+                      </div>
+                      <div className="flex gap-3 items-center">
+                        <input
+                          type="number"
+                          value={amountB}
+                          onChange={e => setAmountB(e.target.value)}
+                          placeholder="0.0"
+                          className="flex-1 bg-transparent text-xl font-bold focus:outline-none text-white placeholder-gray-500"
+                        />
+                        <TokenSelector
+                          value={tokenB}
+                          onChange={setTokenB}
+                          tokens={allAssets}
+                          className="min-w-[120px] bg-blue-600/30 hover:bg-blue-600/50"
+                        />
+                      </div>
+                      <div className="mt-1 text-sm text-blue-300">
+                        ≈ ${getUSDValue(amountB, priceB)}
+                      </div>
+                    </motion.div>
+
+                    <motion.button
+                      onClick={handleAddLiquidity}
+                      disabled={!walletConnected || !amountA || !amountB || loading}
+                      className={`w-full py-4 rounded-xl text-lg font-bold transition-all
+                        ${!walletConnected || !amountA || !amountB || loading
+                          ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg hover:shadow-xl'
+                        }`}
+                      whileHover={!loading ? { scale: 1.02 } : {}}
+                      whileTap={!loading ? { scale: 0.98 } : {}}
+                    >
+                      {!walletConnected
+                        ? '🔗 Connect Your Wallet'
+                        : loading
+                        ? '✨ Adding Liquidity...'
+                        : '💧 Add Liquidity & Start Earning'}
+                    </motion.button>
                   </div>
-                </div>
+                </motion.div>
               )}
-            </div>
-          </div>
 
-          {/* Trending Tokens */}
-          <TrendingTokens />
+              {activeTab === 'remove' && (
+                <motion.div
+                  key="remove"
+                  className="p-6 rounded-2xl bg-gradient-to-b from-red-900/50 to-orange-900/50 border border-red-400/40 backdrop-blur-sm"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                >
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
+                      🔥 Remove Liquidity
+                    </h2>
+                    <p className="text-gray-300 text-sm">
+                      Remove your liquidity to get back your underlying assets plus any earned fees.
+                    </p>
+                  </div>
 
-          {/* Quick Actions */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-green-900/40 to-emerald-900/40 border border-green-500/30">
-            <h3 className="text-lg font-semibold mb-4">Quick Actions ⚡</h3>
-            <div className="space-y-3">
-              <button className="w-full p-3 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-colors text-left">
-                <div className="font-medium">View Pool Details</div>
-                <div className="text-sm text-gray-400">See detailed pool information</div>
-              </button>
-              <button className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left">
-                <div className="font-medium">Calculate Returns</div>
-                <div className="text-sm text-gray-400">Estimate your potential earnings</div>
-              </button>
-              <button 
-                onClick={() => setAiQuery('What are the best liquidity strategies for maximizing yield?')}
-                className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left"
-              >
-                <div className="font-medium">AI Yield Optimization</div>
-                <div className="text-sm text-gray-400">Get personalized strategies</div>
-              </button>
+                  <div className="space-y-6">
+                    <div className="p-4 rounded-xl bg-white/10 border border-red-400/30">
+                      <div className="flex justify-between mb-3">
+                        <span className="text-gray-300 font-medium">Amount to Remove</span>
+                        <span className="text-gray-300">
+                          Your Balance: {formatEarningsValue(liquidityBalance)}
+                        </span>
+                      </div>
+                      
+                      {/* Percentage Slider */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-red-300">{removePercentage}%</span>
+                          <span className="text-red-300">≈ {calculateRemoveAmount()} LP</span>
+                        </div>
+                        
+                        <input
+                          type="range"
+                          min="1"
+                          max="100"
+                          value={removePercentage}
+                          onChange={(e) => setRemovePercentage(Number(e.target.value))}
+                          className="w-full h-2 bg-red-900/30 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                        
+                        <div className="grid grid-cols-4 gap-2">
+                          {[25, 50, 75, 100].map(percent => (
+                            <button
+                              key={percent}
+                              onClick={() => setRemovePercentage(percent)}
+                              className={`py-2 px-3 rounded-lg text-sm font-medium transition-all
+                                ${removePercentage === percent 
+                                  ? 'bg-red-600 text-white' 
+                                  : 'bg-red-900/30 text-red-300 hover:bg-red-600/50'
+                                }`}
+                            >
+                              {percent}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <motion.button
+                      onClick={handleRemoveLiquidity}
+                      disabled={!walletConnected || !liquidityBalance || loading}
+                      className={`w-full py-4 rounded-xl text-lg font-bold transition-all
+                        ${!walletConnected || !liquidityBalance || loading
+                          ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg hover:shadow-xl'
+                        }`}
+                      whileHover={!loading ? { scale: 1.02 } : {}}
+                      whileTap={!loading ? { scale: 0.98 } : {}}
+                    >
+                      {!walletConnected
+                        ? '🔗 Connect Your Wallet'
+                        : !liquidityBalance
+                        ? '💧 No Liquidity to Remove'
+                        : loading
+                        ? '🔥 Removing Liquidity...'
+                        : '🔥 Remove Liquidity'}
+                    </motion.button>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'positions' && (
+                <motion.div
+                  key="positions"
+                  className="space-y-4"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                >
+                  {userPositions.length > 0 ? (
+                    userPositions.map((position) => (
+                      <motion.div
+                        key={position.id}
+                        className="p-6 rounded-2xl bg-gradient-to-b from-green-900/50 to-emerald-900/50 border border-green-400/40 backdrop-blur-sm"
+                        whileHover={{ scale: 1.01 }}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              <span className="font-bold text-lg">{position.tokenA}</span>
+                              <span className="text-gray-400">•</span>
+                              <span className="font-bold text-lg">{position.tokenB}</span>
+                            </div>
+                            <span className="px-2 py-1 rounded-full bg-green-600/30 text-green-300 text-xs font-medium">
+                              Active
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-green-400 font-bold text-lg">{position.apy}</div>
+                            <div className="text-xs text-gray-400">APY</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <div className="text-gray-400 text-xs mb-1">Total Value</div>
+                            <div className="font-bold text-white">{position.value}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 text-xs mb-1">Liquidity</div>
+                            <div className="font-bold text-white">{position.liquidity}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 text-xs mb-1">Unclaimed Rewards</div>
+                            <div className="font-bold text-yellow-400">{position.rewards}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-400 text-xs mb-1">Fees (24h)</div>
+                            <div className="font-bold text-green-400">${position.fees24h}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-4">
+                          <button className="flex-1 py-2 px-4 rounded-lg bg-green-600/30 hover:bg-green-600/50 transition-all text-green-300 font-medium">
+                            💰 Claim Rewards
+                          </button>
+                          <button 
+                            onClick={() => setActiveTab('remove')}
+                            className="flex-1 py-2 px-4 rounded-lg bg-red-600/30 hover:bg-red-600/50 transition-all text-red-300 font-medium"
+                          >
+                            🔥 Remove
+                          </button>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <motion.div
+                      className="p-8 rounded-2xl bg-gradient-to-b from-purple-900/30 to-blue-900/30 border border-purple-400/30 text-center"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                    >
+                      <div className="text-6xl mb-4">💧</div>
+                      <h3 className="text-xl font-bold mb-2">No Liquidity Positions Yet</h3>
+                      <p className="text-gray-400 mb-4">
+                        Start providing liquidity to earn fees from trades!
+                      </p>
+                      <button
+                        onClick={() => setActiveTab('add')}
+                        className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold transition-all"
+                      >
+                        💧 Add Your First Position
+                      </button>
+                    </motion.div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Sidebar */}
+          <motion.div
+            className="space-y-4"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {/* AI Assistant */}
+            <div className="p-4 rounded-xl bg-gradient-to-b from-pink-900/50 to-purple-900/50 border border-pink-400/40">
+              <div className="flex items-center gap-2 mb-3">
+                <SparklesIcon className="h-5 w-5 text-pink-400" />
+                <h3 className="text-lg font-bold">AI Assistant</h3>
+              </div>
+              
+              <div className="space-y-3">
+                <button 
+                  onClick={() => setShowAIAssistant(!showAIAssistant)}
+                  className="w-full p-3 rounded-lg bg-pink-600/30 hover:bg-pink-600/40 transition-all text-left"
+                >
+                  <div className="font-bold text-pink-300 text-sm">🤖 Get Liquidity Advice</div>
+                  <div className="text-xs text-gray-400">Optimize your positions</div>
+                </button>
+                
+                {showAIAssistant && (
+                  <motion.div 
+                    className="space-y-3"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                  >
+                    <textarea
+                      value={aiQuery}
+                      onChange={(e) => setAiQuery(e.target.value)}
+                      placeholder="Ask about optimal pools, impermanent loss, yield strategies..."
+                      className="w-full p-3 rounded-lg bg-white/10 border border-pink-400/30 text-white placeholder-gray-500 resize-none text-sm"
+                      rows={3}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleAIQuery}
+                        disabled={!aiQuery.trim()}
+                        className="flex-1 py-2 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-all text-sm font-bold"
+                      >
+                        ✨ Get Advice
+                      </button>
+                      <button
+                        onClick={() => setShowAIAssistant(false)}
+                        className="py-2 px-3 rounded-lg bg-gray-600/30 hover:bg-gray-600/40 transition-all text-sm"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+                
+                {aiSuggestion && (
+                  <motion.div 
+                    className="p-3 rounded-lg bg-pink-900/30 border border-pink-400/20"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <div className="text-sm text-pink-300">{aiSuggestion}</div>
+                  </motion.div>
+                )}
+              </div>
             </div>
-          </div>
-        </motion.div>
+
+            {/* Pool Stats */}
+            <div className="p-4 rounded-xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40">
+              <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+                <ChartBarIcon className="h-5 w-5 text-purple-400" />
+                Pool Overview
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-sm">Total Value Locked</span>
+                  <span className="text-white font-bold">$12.5M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-sm">24h Volume</span>
+                  <span className="text-white font-bold">$850K</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-sm">Average APY</span>
+                  <span className="text-green-400 font-bold">18.5%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 text-sm">Active Positions</span>
+                  <span className="text-white font-bold">{userPositions.length}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Your Earnings */}
+            {address && (
+              <div className="p-4 rounded-xl bg-gradient-to-b from-green-900/50 to-emerald-900/50 border border-green-400/40">
+                <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+                  <CurrencyDollarIcon className="h-5 w-5 text-green-400" />
+                  Your Earnings
+                </h3>
+                
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg bg-white/10 text-center">
+                    <div className="text-lg font-bold text-green-400">{formatEarningsValue(lpRewards)}</div>
+                    <p className="text-xs text-gray-400">Total Rewards</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-2 rounded-lg bg-white/5 text-center">
+                      <div className="text-sm font-bold text-yellow-400">$68.45</div>
+                      <p className="text-xs text-gray-400">Fees (24h)</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-white/5 text-center">
+                      <div className="text-sm font-bold text-blue-400">2.34%</div>
+                      <p className="text-xs text-gray-400">Pool Share</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="p-4 rounded-xl bg-gradient-to-b from-indigo-900/50 to-purple-900/50 border border-indigo-400/40">
+              <h3 className="text-lg font-bold mb-3 flex items-center gap-2">
+                <BoltIcon className="h-5 w-5 text-indigo-400" />
+                Quick Actions
+              </h3>
+              
+              <div className="space-y-2">
+                <button 
+                  onClick={() => setAiQuery('What are the best pools to provide liquidity right now?')}
+                  className="w-full p-3 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 transition-all text-left"
+                >
+                  <div className="font-bold text-indigo-300 text-sm">🔥 Best Pools</div>
+                  <div className="text-xs text-gray-400">AI recommendations</div>
+                </button>
+                
+                <button className="w-full p-3 rounded-lg bg-green-600/30 hover:bg-green-600/40 transition-all text-left">
+                  <div className="font-bold text-green-300 text-sm">📊 Pool Analytics</div>
+                  <div className="text-xs text-gray-400">Detailed statistics</div>
+                </button>
+                
+                <button className="w-full p-3 rounded-lg bg-yellow-600/30 hover:bg-yellow-600/40 transition-all text-left">
+                  <div className="font-bold text-yellow-300 text-sm">⚡ Rebalance</div>
+                  <div className="text-xs text-gray-400">Optimize positions</div>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
     </div>
   );
