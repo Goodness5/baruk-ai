@@ -14,6 +14,9 @@ import { parseUnits } from 'viem';
 import { useAccount } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { config } from '@/wagmi';
+import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
+import { formatUnits } from 'viem';
+import TrendingTokens from '../components/TrendingTokens';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -26,11 +29,17 @@ export default function TradePage() {
   const setBalancesError = useAppStore(s => s.setBalancesError);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
+  
+  // AMM and liquidity data
+  const { reserves, totalLiquidity, lpFeeBps, isReservesLoading } = useBarukAMM();
+  const { liquidityBalance, lpRewards, balanceOf, isLoading: isUserDataLoading } = useUserAMMData(address);
 
   const [tokenIn, setTokenIn] = useState('TOKEN0');
   const [tokenOut, setTokenOut] = useState('TOKEN1');
   const [amount, setAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
 
   // Get protocol and tokens
   const protocol = getSeiProtocolById(DEFAULT_PROTOCOL_ID) as SeiProtocol;
@@ -256,6 +265,17 @@ export default function TradePage() {
     return () => clearInterval(interval);
   }, [address, wagmiIsConnected, setBalances, setBalancesError]);
 
+  // Listen for AI events from trending tokens
+  useEffect(() => {
+    const handleAIEvent = (event: CustomEvent) => {
+      setAiQuery(event.detail.query);
+      setShowAIDialog(true);
+    };
+
+    window.addEventListener('openAI', handleAIEvent as EventListener);
+    return () => window.removeEventListener('openAI', handleAIEvent as EventListener);
+  }, []);
+
   // Get user's available tokens and format amounts properly
   const userTokens = balances.map(b => ({
     ...b,
@@ -317,6 +337,55 @@ export default function TradePage() {
   //   tokenInBalanceType: typeof tokenInBalance,
   //   tokenOutBalanceType: typeof tokenOutBalance 
   // });
+
+  const handleAIQuery = async () => {
+    if (!aiQuery.trim()) return;
+    
+    try {
+      const response = await fetch('/api/baruk-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: aiQuery,
+          walletAddress: address,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('AI Response:', data);
+      toast.success('AI query processed! Check console for response.');
+      setAiQuery('');
+      setShowAIDialog(false);
+    } catch (error) {
+      console.error('AI query error:', error);
+      toast.error('Failed to process AI query');
+    }
+  };
+
+  // Format liquidity values
+  const formatLiquidityValue = (value: bigint | undefined) => {
+    if (!value) return '0';
+    try {
+      return formatUnits(value, 18);
+    } catch {
+      return '0';
+    }
+  };
+
+  // Calculate user's share of the pool
+  const calculatePoolShare = () => {
+    if (!liquidityBalance || !totalLiquidity) return '0.00';
+    try {
+      const userBalance = Number(formatUnits(liquidityBalance, 18));
+      const total = Number(formatUnits(totalLiquidity, 18));
+      if (total === 0) return '0.00';
+      return ((userBalance / total) * 100).toFixed(4);
+    } catch {
+      return '0.00';
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto mt-10 px-4">
@@ -437,13 +506,45 @@ export default function TradePage() {
           </button>
         </motion.div>
 
-        {/* Sidebar: Your Tokens & Suggestions */}
+        {/* Sidebar: Your Tokens & Liquidity */}
         <motion.div
           className="space-y-6"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
+          {/* Your Liquidity Positions */}
+          {address && (
+            <div className="p-6 rounded-xl bg-gradient-to-b from-green-900/40 to-emerald-900/40 border border-green-500/30">
+              <h2 className="text-lg font-semibold mb-4">Your Liquidity 💧</h2>
+              {isUserDataLoading ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin h-6 w-6 border-2 border-green-400 border-t-transparent rounded-full mx-auto"></div>
+                  <p className="text-gray-400 mt-2">Loading positions...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                    <span className="text-gray-400">Pool Share</span>
+                    <span className="text-green-400 font-semibold">{calculatePoolShare()}%</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                    <span className="text-gray-400">Your Liquidity</span>
+                    <span className="text-white font-semibold">{formatLiquidityValue(liquidityBalance)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                    <span className="text-gray-400">LP Rewards</span>
+                    <span className="text-yellow-400 font-semibold">{formatLiquidityValue(lpRewards)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
+                    <span className="text-gray-400">LP Tokens</span>
+                    <span className="text-blue-400 font-semibold">{formatLiquidityValue(balanceOf)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Your Tokens Section */}
           <div className="p-6 rounded-xl bg-gradient-to-b from-purple-900/40 to-blue-900/40 border border-purple-500/30">
             <h2 className="text-lg font-semibold mb-4">Your Magic Tokens ✨</h2>
@@ -472,17 +573,99 @@ export default function TradePage() {
             )}
           </div>
 
+          {/* AI Agent Integration */}
+          <div className="p-6 rounded-xl bg-gradient-to-b from-pink-900/40 to-purple-900/40 border border-pink-500/30">
+            <h2 className="text-lg font-semibold mb-4">AI Trading Assistant 🤖</h2>
+            <div className="space-y-3">
+              <button 
+                onClick={() => setShowAIDialog(!showAIDialog)}
+                className="w-full p-3 rounded-lg bg-pink-600/20 hover:bg-pink-600/30 transition-colors text-left"
+              >
+                <div className="font-medium">Ask AI Agent</div>
+                <div className="text-sm text-gray-400">Get trading insights & execute trades</div>
+              </button>
+              
+              {showAIDialog && (
+                <div className="space-y-3">
+                  <textarea
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    placeholder="Ask about trending tokens, optimal swaps, or request trades..."
+                    className="w-full p-3 rounded-lg bg-white/5 border border-pink-500/20 text-white placeholder-gray-400 resize-none"
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAIQuery}
+                      disabled={!aiQuery.trim()}
+                      className="flex-1 py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-colors text-sm font-medium"
+                    >
+                      Ask AI
+                    </button>
+                    <button
+                      onClick={() => setShowAIDialog(false)}
+                      className="py-2 px-4 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-colors text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Pool Stats */}
+          {!isReservesLoading && reserves && (
+            <div className="p-6 rounded-xl bg-gradient-to-b from-blue-900/40 to-cyan-900/40 border border-blue-500/30">
+              <h2 className="text-lg font-semibold mb-4">Pool Statistics 📊</h2>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Liquidity</span>
+                  <span className="text-white font-semibold">{formatLiquidityValue(totalLiquidity)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">LP Fee</span>
+                  <span className="text-green-400 font-semibold">{lpFeeBps ? Number(lpFeeBps) / 100 : 0}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reserve 0</span>
+                  <span className="text-blue-400 font-semibold">{Array.isArray(reserves) ? formatUnits(reserves[0], 18) : '0'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reserve 1</span>
+                  <span className="text-purple-400 font-semibold">{Array.isArray(reserves) ? formatUnits(reserves[1], 18) : '0'}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Trending Tokens */}
+          <TrendingTokens />
+
           {/* Quick Actions */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-blue-900/40 to-purple-900/40 border border-blue-500/30">
+          <div className="p-6 rounded-xl bg-gradient-to-b from-indigo-900/40 to-purple-900/40 border border-indigo-500/30">
             <h2 className="text-lg font-semibold mb-4">Quick Actions ⚡</h2>
             <div className="space-y-3">
-              <button className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left">
+              <button 
+                onClick={() => window.location.href = '/liquidity'}
+                className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left"
+              >
                 <div className="font-medium">Add Liquidity</div>
                 <div className="text-sm text-gray-400">Earn fees by providing liquidity</div>
               </button>
-              <button className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left">
-                <div className="font-medium">Stake Tokens</div>
-                <div className="text-sm text-gray-400">Earn rewards by staking</div>
+              <button 
+                onClick={() => window.location.href = '/pools'}
+                className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left"
+              >
+                <div className="font-medium">View All Pools</div>
+                <div className="text-sm text-gray-400">Explore liquidity pools</div>
+              </button>
+              <button 
+                onClick={() => setAiQuery('What are the trending tokens I should buy?')}
+                className="w-full p-3 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-colors text-left"
+              >
+                <div className="font-medium">AI Trading Tips</div>
+                <div className="text-sm text-gray-400">Get personalized advice</div>
               </button>
             </div>
           </div>

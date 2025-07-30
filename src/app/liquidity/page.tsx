@@ -14,6 +14,7 @@ import { useAccount } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { config } from '@/wagmi';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import TrendingTokens from '../components/TrendingTokens';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -31,6 +32,8 @@ export default function LiquidityPage() {
   const [amountB, setAmountB] = useState('');
   const [liquidityAmount, setLiquidityAmount] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAIDialog, setShowAIDialog] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
 
   // Get protocol and tokens
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
@@ -233,6 +236,32 @@ export default function LiquidityPage() {
   // Look up prices by token address
   const priceA = tokenAData ? tokenPrices[tokenAData.address.toLowerCase()] || 0 : 0;
   const priceB = tokenBData ? tokenPrices[tokenBData.address.toLowerCase()] || 0 : 0;
+
+  const handleAIQuery = async () => {
+    if (!aiQuery.trim()) return;
+    
+    try {
+      const response = await fetch('/api/baruk-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: aiQuery,
+          walletAddress: address,
+        }),
+      });
+      
+      const data = await response.json();
+      console.log('AI Response:', data);
+      toast.success('AI query processed! Check console for response.');
+      setAiQuery('');
+      setShowAIDialog(false);
+    } catch (error) {
+      console.error('AI query error:', error);
+      toast.error('Failed to process AI query');
+    }
+  };
 
   const chartData = [
     { date: '2024-07-01', tvl: 10000 },
@@ -457,6 +486,50 @@ export default function LiquidityPage() {
             </div>
           </div>
 
+          {/* AI Agent Integration */}
+          <div className="p-6 rounded-xl bg-gradient-to-b from-pink-900/40 to-purple-900/40 border border-pink-500/30">
+            <h3 className="text-lg font-semibold mb-4">AI Liquidity Assistant 🤖</h3>
+            <div className="space-y-3">
+              <button 
+                onClick={() => setShowAIDialog(!showAIDialog)}
+                className="w-full p-3 rounded-lg bg-pink-600/20 hover:bg-pink-600/30 transition-colors text-left"
+              >
+                <div className="font-medium">Ask AI Agent</div>
+                <div className="text-sm text-gray-400">Get liquidity insights & strategies</div>
+              </button>
+              
+              {showAIDialog && (
+                <div className="space-y-3">
+                  <textarea
+                    value={aiQuery}
+                    onChange={(e) => setAiQuery(e.target.value)}
+                    placeholder="Ask about optimal liquidity ratios, impermanent loss, or yield strategies..."
+                    className="w-full p-3 rounded-lg bg-white/5 border border-pink-500/20 text-white placeholder-gray-400 resize-none"
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAIQuery}
+                      disabled={!aiQuery.trim()}
+                      className="flex-1 py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-colors text-sm font-medium"
+                    >
+                      Ask AI
+                    </button>
+                    <button
+                      onClick={() => setShowAIDialog(false)}
+                      className="py-2 px-4 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-colors text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Trending Tokens */}
+          <TrendingTokens />
+
           {/* Quick Actions */}
           <div className="p-6 rounded-xl bg-gradient-to-b from-green-900/40 to-emerald-900/40 border border-green-500/30">
             <h3 className="text-lg font-semibold mb-4">Quick Actions ⚡</h3>
@@ -468,6 +541,13 @@ export default function LiquidityPage() {
               <button className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left">
                 <div className="font-medium">Calculate Returns</div>
                 <div className="text-sm text-gray-400">Estimate your potential earnings</div>
+              </button>
+              <button 
+                onClick={() => setAiQuery('What are the best liquidity strategies for maximizing yield?')}
+                className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left"
+              >
+                <div className="font-medium">AI Yield Optimization</div>
+                <div className="text-sm text-gray-400">Get personalized strategies</div>
               </button>
             </div>
           </div>
