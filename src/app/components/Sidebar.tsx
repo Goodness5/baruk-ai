@@ -13,7 +13,8 @@ import {
   Cog6ToothIcon,
   Bars3Icon,
   XMarkIcon,
-  SparklesIcon
+  SparklesIcon,
+  ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
