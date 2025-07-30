@@ -1,0 +1,62 @@
+
+   - Network:      http://172.31.83.162:3000
+
+ ✓ Starting...
+ ✓ Ready in 1374ms
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbo
+
+ ○ Compiling /swap ...
+ ✓ Compiled /swap in 28.1s
+ GET /swap 200 in 28504ms
+ ○ Compiling /api/baruk-chat ...
+ ✓ Compiled /api/baruk-chat in 9.7s
+first request::: Request {
+  method: 'POST',
+  url: 'https://localhost:3000/api/baruk-chat',
+  headers: Headers {
+    host: 'bead2ce2-b075-4ad0-a068-26275c25c228-00-ho52cyyqsa7o.riker.replit.dev',
+    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+    'content-length': '187',
+    accept: '*/*',
+    'accept-encoding': 'gzip, deflate, br, zstd',
+    'accept-language': 'en-GB,en;q=0.7',
+    'content-type': 'application/json',
+    dnt: '1',
+    origin: 'https://bead2ce2-b075-4ad0-a068-26275c25c228-00-ho52cyyqsa7o.riker.replit.dev',
+    referer: 'https://bead2ce2-b075-4ad0-a068-26275c25c228-00-ho52cyyqsa7o.riker.replit.dev/swap',
+    'sec-ch-ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Linux"',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
+    'sec-fetch-storage-access': 'active',
+    'sec-gpc': '1',
+    'x-forwarded-for': '185.177.126.127, 10.81.11.92',
+    'x-forwarded-proto': 'https',
+    'x-replit-user-bio': '',
+    'x-replit-user-id': '',
+    'x-replit-user-name': '',
+    'x-replit-user-profile-image': '',
+    'x-replit-user-roles': '',
+    'x-replit-user-teams': '',
+    'x-replit-user-url': '',
+    'x-forwarded-host': 'bead2ce2-b075-4ad0-a068-26275c25c228-00-ho52cyyqsa7o.riker.replit.dev',
+    'x-forwarded-port': '3000'
+  },
+  destination: '',
+  referrer: 'about:client',
+  referrerPolicy: '',
+  mode: 'cors',
+  credentials: 'same-origin',
+  cache: 'default',
+  redirect: 'follow',
+  integrity: '',
+  keepalive: false,
+  isReloadNavigation: false,
+  isHistoryNavigation: false,
+  signal: AbortSignal { aborted: false }
+}
+ POST /api/baruk-chat 400 in 10301ms
