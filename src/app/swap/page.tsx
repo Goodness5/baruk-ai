@@ -11,6 +11,7 @@ import { useContractInteraction } from '../lib/contracts';
 import { useBarukContract } from '../lib/useBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
+  import { useYakaContract } from '../lib/useYakaContract';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
@@ -29,6 +30,9 @@ export default function TradePage() {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const { callContract, callTokenContract } = useBarukContract('router');
+//
+  const { callContract: callYaka, callTokenContract: callYakaToken } = useYakaContract();
+//
   const { isConnected } = useContractInteraction();
 
   const tokenInBalance = balances.find(b => b.token === tokenIn)?.amount || '0';
@@ -60,18 +64,55 @@ export default function TradePage() {
       const deadlineTime = BigInt(Math.floor(Date.now() / 1000) + 600); // 10 minutes
 
       // First approve the router to spend tokens
-      await callTokenContract(
-        tokenIn,
-        'approve',
-        [contractAddresses.router, amountInWei]
-      );
+      // await callTokenContract(
+      //   tokenIn,
+      //   'approve',
+      //   [contractAddresses.router, amountInWei]
+      // );
 
-      // Then perform the swap
-      await callContract(
-        'swapExactTokensForTokens',
-        [amountInWei, minOutWei, [tokenIn, tokenOut], address, deadlineTime],
-        { account: address }
-      );
+      // // Then perform the swap
+      // await callContract(
+      //   'swapExactTokensForTokens',
+      //   [amountInWei, minOutWei, [tokenIn, tokenOut], address, deadlineTime],
+      //   { account: address }
+      // );
+
+
+
+//.......
+      if (protocolId === 'baruk') {
+        await callTokenContract(
+          tokenIn,
+          'approve',
+          [contractAddresses.router, amountInWei]
+        );
+      
+        await callContract(
+          'swapExactTokensForTokens',
+          [amountInWei, minOutWei, [tokenIn, tokenOut], address, deadlineTime],
+          { account: address }
+        );
+      } else if (protocolId === 'yaka') {
+        const { callYakaSwap } = await import('../lib/yakaTools');
+        await callYakaSwap({
+          from: tokenIn,
+          to: tokenOut,
+          amount,
+          address,
+          callContract: callYaka,
+          callTokenContract: callYakaToken
+        });
+      }
+      
+      
+
+//......
+
+
+
+
+
+
       const minAmountOut = 0n;
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
       const recipient = address as `0x${string}`;
@@ -131,6 +172,18 @@ export default function TradePage() {
     return () => clearInterval(interval);
   }, [address, isConnected, setBalances, setBalancesError]);
 
+
+// .......
+      // Reset selected tokens when protocol changes
+    useEffect(() => {
+      const tokens = getProtocolTokens(protocolId);
+      setTokenIn(tokens[0]?.address || '');
+      setTokenOut(tokens[1]?.address || '');
+    }, [protocolId]);
+// .......
+
+
+
   // Get user's available tokens and format amounts properly
   const userTokens = balances.map(b => ({
     ...b,
@@ -162,6 +215,29 @@ export default function TradePage() {
         </motion.div>
       )}
 
+
+{/* start */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">Select Protocol</label>
+        <select
+          value={protocolId}
+          onChange={(e) => setProtocolId(e.target.value)}
+          className="w-full p-3 rounded-lg bg-white/5 border border-purple-500/20 text-white"
+        >
+          {SEI_PROTOCOLS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
+{/* stop */}
+
+
+
+
+
+
       <div className="grid md:grid-cols-[1fr,380px] gap-8">
         {/* Main Swap Interface */}
         <motion.div
@@ -176,7 +252,7 @@ export default function TradePage() {
               Swap Tokens Magically ✨
             </h1>
             <p className="text-gray-300 text-sm">
-              Just choose your tokens, enter an amount, and click swap. It's that simple!
+              Just choose your tokens, enter an amount, and click swap. It&apos;s that simple!
             </p>
           </div>
 
@@ -197,12 +273,14 @@ export default function TradePage() {
                   placeholder="0.0"
                   className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
                 />
-                <TokenSelector
-                  selectedToken={tokenIn}
-                  onSelect={setTokenIn}
-                  tokens={protocolTokens}
-                  className="min-w-[120px]"
-                />
+
+            <TokenSelector
+                value={tokenIn}
+                onChange={setTokenIn}
+                tokens={protocolTokens}
+                className="min-w-[120px]"
+              />
+
               </div>
               <div className="mt-1 text-sm text-gray-500">
                 ≈ ${getUSDValue(amount, priceIn)}
@@ -235,8 +313,8 @@ export default function TradePage() {
                   {amount ? (parseFloat(amount) * (priceIn / priceOut)).toFixed(6) : '0.0'}
                 </div>
                 <TokenSelector
-                  selectedToken={tokenOut}
-                  onSelect={setTokenOut}
+                  value={tokenOut}
+                  onChange={setTokenOut}
                   tokens={protocolTokens}
                   className="min-w-[120px]"
                 />
