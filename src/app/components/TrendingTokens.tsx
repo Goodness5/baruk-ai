@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUpIcon, TrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 
 interface TrendingToken {
@@ -132,9 +132,9 @@ export default function TrendingTokens({ className = "" }: { className?: string 
                 token.change24h >= 0 ? 'text-green-400' : 'text-red-400'
               }`}>
                 {token.change24h >= 0 ? (
-                  <TrendingUpIcon className="h-3 w-3" />
+                  <ArrowTrendingUpIcon className="h-3 w-3" />
                 ) : (
-                  <TrendingDownIcon className="h-3 w-3" />
+                  <ArrowTrendingDownIcon className="h-3 w-3" />
                 )}
                 {Math.abs(token.change24h).toFixed(2)}%
               </div>
