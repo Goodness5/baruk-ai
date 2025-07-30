@@ -3,12 +3,15 @@ import { ChatOpenAI } from '@langchain/openai';
 import { initializeAgentExecutorWithOptions } from 'langchain/agents';
 import { DynamicTool } from 'langchain/tools';
 import * as mcpTools from '../../lib/mcpTools';
+import * as barukTools from '../../lib/barukTools';
 
 const SYSTEM_PROMPT = `You are Baruk, an advanced AI agent specialized in DeFi operations on the Sei blockchain. You have comprehensive access to blockchain data and can perform various DeFi operations.
 
 **Your Capabilities:**
 🏦 **Wallet Management:**
-- Check wallet balances and token holdings
+- Check wallet balances and SEI holdings
+- Get all token holdings for a wallet address
+- Check specific token balances
 - Analyze token flows and transactions
 - Monitor portfolio performance
 
@@ -25,6 +28,21 @@ const SYSTEM_PROMPT = `You are Baruk, an advanced AI agent specialized in DeFi o
 
 Always introduce yourself as 'My name is Baruk, your DeFi AI agent for the Sei ecosystem.' Be helpful, strategic, and focus on maximizing user returns while managing risk appropriately.
 
+**Response Formatting Guidelines:**
+- **Always format responses in a clean, structured manner**
+- **Use bullet points and numbered lists for better readability**
+- **Highlight important numbers and addresses with bold formatting**
+- **Group related information in sections with clear headers**
+- **Use emojis strategically to make responses more engaging**
+- **Format token balances with proper spacing and symbols**
+- **Always provide a summary or conclusion**
+
+**Tool Selection Guidelines:**
+- **For complete wallet analysis** (native SEI + all tokens): Use get_wallet_token_holdings
+- **For native SEI balance only**: Use get_balance
+- **For specific token balance**: Use get_token_balance (requires both wallet and token addresses)
+- **For token information**: Use get_token_info
+
 **Key Principles:**
 - Always analyze risk before executing any transaction
 - Provide clear explanations of strategies and their implications
@@ -38,10 +56,23 @@ When users ask for help, provide actionable strategies and be ready to execute a
 const tools = [
   new DynamicTool({
     name: "get_balance",
-    description: "Get wallet balance and token holdings for a specific address",
+    description: "Get ONLY native SEI balance for a wallet address (not token holdings)",
     func: async (input: string) => {
       try {
-        const { address } = JSON.parse(input);
+        // Parse the input - it could be either a direct address string or a JSON object
+        let address;
+        try {
+          const parsed = JSON.parse(input);
+          address = parsed.address || parsed.input || input;
+        } catch {
+          // If it's not JSON, treat it as a direct address string
+          address = input;
+        }
+        
+        if (!address) {
+          throw new Error('No address provided');
+        }
+        
         return JSON.stringify(await mcpTools.getBalance(address));
       } catch (error) {
         return `Error: ${error instanceof Error ? error.message : 'Invalid input'}`;
@@ -54,7 +85,20 @@ const tools = [
     description: "Get specific token balance for a wallet address",
     func: async (input: string) => {
       try {
-        const { address, tokenAddress } = JSON.parse(input);
+        // Parse the input - it could be either a direct string or a JSON object
+        let address, tokenAddress;
+        try {
+          const parsed = JSON.parse(input);
+          address = parsed.address || parsed.input;
+          tokenAddress = parsed.tokenAddress;
+        } catch {
+          throw new Error('Invalid JSON input');
+        }
+        
+        if (!address || !tokenAddress) {
+          throw new Error('Both address and tokenAddress are required');
+        }
+        
         return JSON.stringify(await mcpTools.getTokenBalance(address, tokenAddress));
       } catch (error) {
         return `Error: ${error instanceof Error ? error.message : 'Invalid input'}`;
@@ -67,7 +111,20 @@ const tools = [
     description: "Get detailed information about a specific token",
     func: async (input: string) => {
       try {
-        const { tokenAddress } = JSON.parse(input);
+        // Parse the input - it could be either a direct string or a JSON object
+        let tokenAddress;
+        try {
+          const parsed = JSON.parse(input);
+          tokenAddress = parsed.tokenAddress || parsed.input || input;
+        } catch {
+          // If it's not JSON, treat it as a direct token address string
+          tokenAddress = input;
+        }
+        
+        if (!tokenAddress) {
+          throw new Error('No token address provided');
+        }
+        
         return JSON.stringify(await mcpTools.getTokenInfo(tokenAddress));
       } catch (error) {
         return `Error: ${error instanceof Error ? error.message : 'Invalid input'}`;
@@ -78,7 +135,7 @@ const tools = [
   new DynamicTool({
     name: "get_chain_info",
     description: "Get current blockchain information including latest block and gas prices",
-    func: async (input: string) => {
+    func: async (_input: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
       try {
         return JSON.stringify(await mcpTools.getChainInfo());
       } catch (error) {
@@ -92,9 +149,52 @@ const tools = [
     description: "Analyze token flows for meme coins and detect unusual activity",
     func: async (input: string) => {
       try {
-        const { tokenAddress, hours = 24 } = JSON.parse(input);
+        // Parse the input - it could be either a direct string or a JSON object
+        let tokenAddress;
+        try {
+          const parsed = JSON.parse(input);
+          tokenAddress = parsed.tokenAddress || parsed.input || input;
+        } catch {
+          // If it's not JSON, treat it as a direct token address string
+          tokenAddress = input;
+        }
+        
+        if (!tokenAddress) {
+          throw new Error('No token address provided');
+        }
+        
         return JSON.stringify(await mcpTools.analyzeMemeCoinFlows(tokenAddress));
       } catch (error) {
+        return `Error: ${error instanceof Error ? error.message : 'Invalid input'}`;
+      }
+    }
+  }),
+
+  new DynamicTool({
+    name: "get_wallet_token_holdings",
+    description: "Get complete token holdings for a wallet address including native SEI balance and all ERC-20 tokens. Use this for comprehensive wallet analysis.",
+    func: async (input: string) => {
+      try {
+        // Parse the input - it could be either a direct address string or a JSON object
+        let address;
+        try {
+          const parsed = JSON.parse(input);
+          address = parsed.address || parsed.input || input;
+        } catch {
+          // If it's not JSON, treat it as a direct address string
+          address = input;
+        }
+        
+        if (!address) {
+          throw new Error('No address provided');
+        }
+        
+        console.log(`[AI Tool] Getting wallet token holdings for: ${address}`);
+        const result = await barukTools.getWalletTokenHoldings(address);
+        console.log(`[AI Tool] Result:`, JSON.stringify(result, null, 2));
+        return JSON.stringify(result);
+      } catch (error) {
+        console.error(`[AI Tool] Error:`, error);
         return `Error: ${error instanceof Error ? error.message : 'Invalid input'}`;
       }
     }
@@ -102,7 +202,7 @@ const tools = [
 ];
 
 // Initialize the agent executor
-let agentExecutor: any;
+let agentExecutor: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 async function initializeAgent() {
   if (!agentExecutor) {
@@ -121,7 +221,15 @@ async function initializeAgent() {
         verbose: process.env.NODE_ENV === 'development',
         agentArgs: { 
           prefix: SYSTEM_PROMPT,
-          suffix: `Always be helpful and provide detailed explanations of DeFi concepts when needed. If you encounter errors, explain them in user-friendly terms and suggest solutions.`
+          suffix: `Always be helpful and provide detailed explanations of DeFi concepts when needed. If you encounter errors, explain them in user-friendly terms and suggest solutions.
+
+**IMPORTANT: Always format responses in a clean, structured manner with:**
+- Bullet points and numbered lists for readability
+- Bold formatting for important numbers and addresses
+- Clear section headers with emojis
+- Proper spacing and formatting for token balances
+- Summary or conclusion at the end
+- Use markdown formatting for better presentation`
         },
         maxIterations: 5,
         earlyStoppingMethod: "generate",
