@@ -2,160 +2,188 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { ArrowTrendingUpIcon, ArrowTrendingDownIcon, SparklesIcon, FireIcon, StarIcon } from '@heroicons/react/24/outline';
 import { useAppStore } from '../store/useAppStore';
 
-interface TrendingToken {
+interface HotCoin {
   symbol: string;
-  address: string;
+  name: string;
   price: number;
   change24h: number;
-  volume24h: number;
-  marketCap: number;
+  volume: number;
+  isHot: boolean;
+  emoji: string;
+  description: string;
 }
 
-export default function TrendingTokens({ className = "" }: { className?: string }) {
+export default function HotCoins() {
+  const [hotCoins, setHotCoins] = useState<HotCoin[]>([]);
+  const [selectedCoin, setSelectedCoin] = useState<HotCoin | null>(null);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const [trendingTokens, setTrendingTokens] = useState<TrendingToken[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate trending tokens data - in a real app, this would come from an API
-    const generateTrendingTokens = () => {
-      const mockTrendingData: TrendingToken[] = [
-        {
-          symbol: 'TOKEN0',
-          address: '0x8923889697C9467548ABe8E815105993EBC785b6',
-          price: tokenPrices['0x8923889697c9467548abe8e815105993ebc785b6'] || 1.5,
-          change24h: 15.32,
-          volume24h: 2400000,
-          marketCap: 45000000
-        },
-        {
-          symbol: 'TOKEN1',
-          address: '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7',
-          price: tokenPrices['0xf2c653e2a1f21ef409d0489c7c1d754d9f2905f7'] || 2.3,
-          change24h: -8.45,
-          volume24h: 1800000,
-          marketCap: 32000000
-        },
-        {
-          symbol: 'TOKEN2',
-          address: '0xD6383ef8A67E929274cE9ca05b694f782A5070D7',
-          price: tokenPrices['0xd6383ef8a67e929274ce9ca05b694f782a5070d7'] || 0.8,
-          change24h: 24.67,
-          volume24h: 3200000,
-          marketCap: 28000000
-        },
-        {
-          symbol: 'SEI',
-          address: 'native',
-          price: 0.65,
-          change24h: 5.23,
-          volume24h: 12000000,
-          marketCap: 850000000
-        }
-      ];
+    // Create demo hot coins with engaging descriptions
+    const demoCoins: HotCoin[] = [
+      {
+        symbol: 'TOKEN0',
+        name: 'Magic Gold',
+        price: 1.50,
+        change24h: 12.5,
+        volume: 150000,
+        isHot: true,
+        emoji: '🏆',
+        description: 'The golden standard! Up 12% today!'
+      },
+      {
+        symbol: 'TOKEN1',
+        name: 'Power Crystal',
+        price: 2.30,
+        change24h: -3.2,
+        volume: 89000,
+        isHot: false,
+        emoji: '💎',
+        description: 'Temporary dip - perfect buying opportunity!'
+      },
+      {
+        symbol: 'TOKEN2',
+        name: 'Lightning Bolt',
+        price: 0.80,
+        change24h: 8.7,
+        volume: 220000,
+        isHot: true,
+        emoji: '⚡',
+        description: 'Fast rising! High volume today!'
+      },
+      {
+        symbol: 'SEI',
+        name: 'Sei Coin',
+        price: 0.45,
+        change24h: 5.4,
+        volume: 300000,
+        isHot: true,
+        emoji: '🌟',
+        description: 'Network native coin showing strength!'
+      }
+    ];
 
-      // Sort by volume to show trending
-      const sorted = mockTrendingData.sort((a, b) => b.volume24h - a.volume24h);
-      setTrendingTokens(sorted);
-      setIsLoading(false);
-    };
-
-    generateTrendingTokens();
-    const interval = setInterval(generateTrendingTokens, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
+    setHotCoins(demoCoins);
   }, [tokenPrices]);
 
-  const formatPrice = (price: number) => {
-    return price < 1 ? price.toFixed(4) : price.toFixed(2);
+  const handleCoinSelect = (coin: HotCoin) => {
+    setSelectedCoin(coin);
+    
+    // Trigger AI assistant with coin info
+    const event = new CustomEvent('openAI', {
+      detail: {
+        query: `Tell me about ${coin.name} (${coin.symbol}). ${coin.description} Should I buy it now? What's your analysis?`
+      }
+    });
+    window.dispatchEvent(event);
   };
 
-  const formatVolume = (volume: number) => {
-    if (volume >= 1000000) {
-      return `$${(volume / 1000000).toFixed(1)}M`;
-    }
-    return `$${(volume / 1000).toFixed(0)}K`;
+  const handleQuickBuy = (coin: HotCoin) => {
+    // Trigger AI assistant for quick buy
+    const event = new CustomEvent('openAI', {
+      detail: {
+        query: `I want to buy ${coin.name} (${coin.symbol}). It's ${coin.change24h > 0 ? 'up' : 'down'} ${Math.abs(coin.change24h)}% today. How much should I buy and what's the best strategy?`
+      }
+    });
+    window.dispatchEvent(event);
   };
-
-  const formatMarketCap = (marketCap: number) => {
-    if (marketCap >= 1000000) {
-      return `$${(marketCap / 1000000).toFixed(1)}M`;
-    }
-    return `$${(marketCap / 1000).toFixed(0)}K`;
-  };
-
-  if (isLoading) {
-    return (
-      <div className={`p-6 rounded-xl bg-gradient-to-b from-orange-900/40 to-red-900/40 border border-orange-500/30 ${className}`}>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <SparklesIcon className="h-5 w-5 text-orange-400" />
-          Trending Tokens 🔥
-        </h3>
-        <div className="text-center py-4">
-          <div className="animate-spin h-6 w-6 border-2 border-orange-400 border-t-transparent rounded-full mx-auto"></div>
-          <p className="text-gray-400 mt-2">Loading trending tokens...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className={`p-6 rounded-xl bg-gradient-to-b from-orange-900/40 to-red-900/40 border border-orange-500/30 ${className}`}>
-      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-        <SparklesIcon className="h-5 w-5 text-orange-400" />
-        Trending Tokens 🔥
-      </h3>
+    <div className="p-6 rounded-xl bg-gradient-to-b from-orange-900/50 to-red-900/50 border border-orange-400/40">
+      <div className="flex items-center gap-2 mb-4">
+        <FireIcon className="h-6 w-6 text-orange-400" />
+        <h3 className="text-xl font-bold text-orange-300">🔥 Hot Coins</h3>
+      </div>
+      
       <div className="space-y-3">
-        {trendingTokens.map((token, index) => (
+        {hotCoins.map((coin, index) => (
           <motion.div
-            key={token.address}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
+            key={coin.symbol}
+            className={`p-4 rounded-lg transition-all cursor-pointer border ${
+              coin.isHot 
+                ? 'bg-gradient-to-r from-orange-600/20 to-red-600/20 border-orange-400/30 hover:from-orange-600/30 hover:to-red-600/30' 
+                : 'bg-white/10 border-gray-500/30 hover:bg-white/15'
+            }`}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            onClick={() => handleCoinSelect(coin)}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-gray-400">#{index + 1}</span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{coin.emoji}</span>
+                <div>
+                  <div className="font-bold text-white flex items-center gap-1">
+                    {coin.name}
+                    {coin.isHot && <FireIcon className="h-4 w-4 text-orange-400" />}
+                  </div>
+                  <div className="text-sm text-gray-400">{coin.symbol}</div>
+                </div>
               </div>
-              <div>
-                <div className="font-medium text-white">{token.symbol}</div>
-                <div className="text-xs text-gray-400">{formatVolume(token.volume24h)} vol</div>
+              
+              <div className="text-right">
+                <div className="font-bold text-white">${coin.price.toFixed(2)}</div>
+                <div className={`flex items-center gap-1 text-sm ${
+                  coin.change24h >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {coin.change24h >= 0 ? (
+                    <ArrowTrendingUpIcon className="h-3 w-3" />
+                  ) : (
+                    <ArrowTrendingDownIcon className="h-3 w-3" />
+                  )}
+                  {Math.abs(coin.change24h).toFixed(1)}%
+                </div>
               </div>
             </div>
             
-            <div className="text-right">
-              <div className="text-white font-semibold">${formatPrice(token.price)}</div>
-              <div className={`text-xs flex items-center gap-1 ${
-                token.change24h >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {token.change24h >= 0 ? (
-                  <ArrowTrendingUpIcon className="h-3 w-3" />
-                ) : (
-                  <ArrowTrendingDownIcon className="h-3 w-3" />
-                )}
-                {Math.abs(token.change24h).toFixed(2)}%
-              </div>
+            <div className="text-xs text-gray-400 mb-3">
+              {coin.description}
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleQuickBuy(coin);
+                }}
+                className={`flex-1 py-2 px-3 rounded-md text-xs font-bold transition-all ${
+                  coin.isHot
+                    ? 'bg-orange-600/40 hover:bg-orange-600/60 text-orange-200'
+                    : 'bg-purple-600/40 hover:bg-purple-600/60 text-purple-200'
+                }`}
+              >
+                🛒 Quick Buy
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCoinSelect(coin);
+                }}
+                className="flex-1 py-2 px-3 rounded-md text-xs font-bold bg-blue-600/40 hover:bg-blue-600/60 text-blue-200 transition-all"
+              >
+                📊 Analyze
+              </button>
             </div>
           </motion.div>
         ))}
       </div>
       
-      <div className="mt-4 pt-4 border-t border-orange-500/20">
-        <button 
-          onClick={() => {
-            const event = new CustomEvent('openAI', { 
-              detail: { query: 'What are the best trending tokens to buy right now based on volume and price action?' }
-            });
-            window.dispatchEvent(event);
-          }}
-          className="w-full p-2 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 transition-colors text-sm font-medium"
-        >
-          Ask AI About These Tokens 🤖
-        </button>
-      </div>
+      <motion.div 
+        className="mt-4 p-3 rounded-lg bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-400/30 text-center"
+        whileHover={{ scale: 1.02 }}
+      >
+        <div className="flex items-center justify-center gap-2 text-purple-300 font-bold">
+          <SparklesIcon className="h-4 w-4" />
+          <span>AI-Powered Insights</span>
+        </div>
+        <p className="text-xs text-gray-400 mt-1">
+          Click any coin for personalized advice from your magic assistant!
+        </p>
+      </motion.div>
     </div>
   );
 }

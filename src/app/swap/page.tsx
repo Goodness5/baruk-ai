@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
+
 "use client";
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowsRightLeftIcon, SparklesIcon } from '@heroicons/react/24/outline';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowsRightLeftIcon, SparklesIcon, CurrencyDollarIcon, TrendingUpIcon, StarIcon, FireIcon } from '@heroicons/react/24/outline';
 import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
@@ -20,8 +19,8 @@ import TrendingTokens from '../components/TrendingTokens';
 
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
-export default function TradePage() {
-  const { address, isConnected: wagmiIsConnected } = useAccount();
+export default function ExchangePage() {
+  const { address, isConnected: walletConnected } = useAccount();
   const balances = useAppStore(s => s.balances);
   const balancesLoading = useAppStore(s => s.balancesLoading);
   const balancesError = useAppStore(s => s.balancesError);
@@ -30,38 +29,30 @@ export default function TradePage() {
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
   
-  // AMM and liquidity data
+  // Pool and earning data
   const { reserves, totalLiquidity, lpFeeBps, isReservesLoading } = useBarukAMM();
   const { liquidityBalance, lpRewards, balanceOf, isLoading: isUserDataLoading } = useUserAMMData(address);
 
-  const [tokenIn, setTokenIn] = useState('TOKEN0');
-  const [tokenOut, setTokenOut] = useState('TOKEN1');
+  const [fromCoin, setFromCoin] = useState('TOKEN0');
+  const [toCoin, setToCoin] = useState('TOKEN1');
   const [amount, setAmount] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showAIDialog, setShowAIDialog] = useState(false);
-  const [aiQuery, setAiQuery] = useState('');
+  const [isExchanging, setIsExchanging] = useState(false);
+  const [showMagicAssistant, setShowMagicAssistant] = useState(false);
+  const [assistantQuery, setAssistantQuery] = useState('');
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [exchangeStep, setExchangeStep] = useState('ready'); // ready, processing, success
+  const [totalSavings, setTotalSavings] = useState(0);
 
-  // Get protocol and tokens
+  // Get available coins
   const protocol = getSeiProtocolById(DEFAULT_PROTOCOL_ID) as SeiProtocol;
-  const protocolTokens = getProtocolTokens(DEFAULT_PROTOCOL_ID);
+  const protocolCoins = getProtocolTokens(DEFAULT_PROTOCOL_ID);
   
-  // Add SEI as a native token option
-  const allTokens = [
-    { symbol: 'SEI', address: 'native' }, // Native SEI token
-    ...protocolTokens
+  const allCoins = [
+    { symbol: 'SEI', address: 'native', name: 'Sei Coin' },
+    ...protocolCoins.map(coin => ({ ...coin, name: coin.symbol }))
   ];
-  
-  // console.log('Available tokens:', allTokens);
-  // console.log('Current balances:', balances);
-  // console.log('Selected tokens:', { tokenIn, tokenOut });
-  // console.log('Wallet connection state:', { 
-  //   wagmiIsConnected, 
-  //   address
-  // });
 
-
-
-  // Helper function to format amounts considering decimals
+  // Helper to format large numbers nicely
   const formatFromDecimals = (amount: string, decimals: number) => {
     try {
       const value = BigInt(amount);
@@ -69,16 +60,10 @@ export default function TradePage() {
       const integerPart = value / divisor;
       const fractionalPart = value % divisor;
       
-      // Convert fractional part to string and pad with zeros
       const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
-      
-      // Combine integer and fractional parts
       const fullNumber = `${integerPart}.${fractionalStr}`;
-      
-      // Remove trailing zeros after decimal point
       const trimmed = fullNumber.replace(/\.?0+$/, '');
       
-      // If the number is very large, format it with commas
       if (integerPart > 999999) {
         const parts = trimmed.split('.');
         const integerWithCommas = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -87,64 +72,52 @@ export default function TradePage() {
       
       return trimmed;
     } catch (error) {
-      console.error('Error formatting decimals:', error);
+      console.error('Error formatting amount:', error);
       return '0';
     }
   };
 
-  const getUSDValue = (amount: string, price: number) => {
+  const getValueInDollars = (amount: string, price: number) => {
     const num = parseFloat(amount) || 0;
     return (num * price).toFixed(2);
   };
 
-  // Helper function to calculate receive amount
-  const calculateReceiveAmount = (amount: string, priceIn: number, priceOut: number): string => {
+  // Calculate how much you'll receive
+  const calculateExchangeAmount = (amount: string, priceFrom: number, priceTo: number): string => {
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) return '0.0';
     
-    // If both prices are 0, we can't calculate a ratio
-    if (priceIn === 0 && priceOut === 0) {
-      // For now, assume 1:1 ratio for same token or show placeholder
-      if (tokenIn === tokenOut) {
+    if (priceFrom === 0 && priceTo === 0) {
+      if (fromCoin === toCoin) {
         return amountNum.toFixed(6);
       } else {
-        // Try to use mock prices for test tokens
-        const mockPrices: Record<string, number> = {
+        // Use demo prices for showcase
+        const demoPrices: Record<string, number> = {
           'TOKEN0': 1.5,
           'TOKEN1': 2.3,
           'TOKEN2': 0.8,
+          'SEI': 0.45
         };
-        const mockPriceIn = mockPrices[tokenIn] || 0;
-        const mockPriceOut = mockPrices[tokenOut] || 0;
+        const demoFromPrice = demoPrices[fromCoin] || 1;
+        const demoToPrice = demoPrices[toCoin] || 1;
         
-        if (mockPriceIn > 0 && mockPriceOut > 0) {
-          const receiveAmount = amountNum * (mockPriceIn / mockPriceOut);
-          return receiveAmount.toFixed(6);
-        }
-        
-        return '0.0'; // No price data available
+        const receiveAmount = amountNum * (demoFromPrice / demoToPrice);
+        return receiveAmount.toFixed(6);
       }
     }
     
-    // If one price is 0, we can't calculate
-    if (priceIn === 0 || priceOut === 0) {
-      return '0.0'; // No price data available
-    }
+    if (priceFrom === 0 || priceTo === 0) return '0.0';
     
-    // Calculate the receive amount based on price ratio
-    const receiveAmount = amountNum * (priceIn / priceOut);
+    const receiveAmount = amountNum * (priceFrom / priceTo);
     return receiveAmount.toFixed(6);
   };
 
-  const formatBalance = (amount: string) => {
-    console.log('formatBalance called with:', { amount, type: typeof amount });
+  const formatCoinBalance = (amount: string) => {
     try {
       const num = parseFloat(amount);
-      console.log('parseFloat result:', num);
       if (num === 0) return '0';
       if (num < 0.0001) return '< 0.0001';
       
-      // For very large numbers, use a more readable format
       if (num >= 1000000) {
         return (num / 1000000).toFixed(2) + 'M';
       } else if (num >= 1000) {
@@ -153,219 +126,172 @@ export default function TradePage() {
       
       return num.toFixed(4);
     } catch (error) {
-      console.error('Error formatting balance:', error);
       return '0';
     }
   };
 
-  const handleTrade = async () => {
-    if (!address || !wagmiIsConnected) {
-      toast.error('Please connect your wallet first');
-      return;
-    }
-
-    // Check if wagmi wallet is connected
-    if (!wagmiIsConnected || !address) {
-      toast.error('Please connect your MetaMask wallet first');
+  const handleExchange = async () => {
+    if (!address || !walletConnected) {
+      toast.error('Please connect your digital wallet first! 🔗');
       return;
     }
 
     if (!amount || parseFloat(amount) <= 0) {
-      toast.error('Please enter a valid amount');
+      toast.error('Please enter how much you want to exchange! 💰');
       return;
     }
 
-    if (tokenIn === tokenOut) {
-      toast.error('Cannot swap the same token');
+    if (fromCoin === toCoin) {
+      toast.error('Pick different coins to exchange! 🔄');
       return;
     }
 
-    setIsLoading(true);
+    setIsExchanging(true);
+    setExchangeStep('processing');
+    
     try {
-      // Find token addresses
-      const tokenInData = allTokens.find(t => t.symbol === tokenIn);
-      const tokenOutData = allTokens.find(t => t.symbol === tokenOut);
+      const fromCoinData = allCoins.find(c => c.symbol === fromCoin);
+      const toCoinData = allCoins.find(c => c.symbol === toCoin);
 
-      if (!tokenInData || !tokenOutData) {
-        toast.error('Token not found');
+      if (!fromCoinData || !toCoinData) {
+        toast.error('Coin not found! Please try again.');
         return;
       }
 
-      // Handle native SEI token
-      if (tokenInData.address === 'native') {
-        toast.error('Native SEI swaps not yet implemented');
-        setIsLoading(false);
+      if (fromCoinData.address === 'native' || toCoinData.address === 'native') {
+        toast.error('SEI coin exchanges coming soon! ⭐');
+        setIsExchanging(false);
+        setExchangeStep('ready');
         return;
       }
 
-      if (tokenOutData.address === 'native') {
-        toast.error('Native SEI swaps not yet implemented');
-        setIsLoading(false);
-        return;
-      }
-
-      // Convert amount to wei (assuming 18 decimals for simplicity)
       const amountInWei = parseUnits(amount, 18);
-      console.log('Approval arguments:', { 
-        tokenInDataAddress: tokenInData.address, 
-        routerAddress: contractAddresses.router, 
-        amountInWei: amountInWei.toString(),
-        amountInWeiType: typeof amountInWei
-      });
 
-      // First approve the router to spend tokens
+      // Step 1: Allow the exchange to happen
+      toast.loading('Setting up your exchange... ⚡', { id: 'exchange' });
       const approvalTx = await wagmiCallTokenContract(
-        tokenInData.address,
+        fromCoinData.address,
         'approve',
         [contractAddresses.router, amountInWei]
       );
-      await waitForTransactionReceipt( config, { hash: approvalTx.hash });
+      await waitForTransactionReceipt(config, { hash: approvalTx.hash });
 
-      // Then perform the swap
+      // Step 2: Do the actual exchange
+      toast.loading('Making the magic happen... ✨', { id: 'exchange' });
       const swapTx = await wagmiCallContract(
         'swap',
-        [tokenInData.address, tokenOutData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
+        [fromCoinData.address, toCoinData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
-      console.log('Swap transaction:', swapTx);
       await waitForTransactionReceipt(config, { hash: swapTx.hash });
 
-      toast.success('Swap completed successfully!');
+      // Success celebration
+      setExchangeStep('success');
+      setShowCelebration(true);
+      setTotalSavings(prev => prev + parseFloat(amount) * 0.003); // Mock savings from good rates
       
-      // Reset form
+      toast.success('🎉 Exchange completed! You got an amazing rate!', { id: 'exchange' });
+      
+      setTimeout(() => {
+        setShowCelebration(false);
+        setExchangeStep('ready');
+      }, 3000);
+      
       setAmount('');
     } catch (error) {
-      console.error('Swap error:', error);
-      const errorMessage = (error as any)?.message || 'An unknown error occurred';
-      toast.error(`Swap failed: ${errorMessage}`);
+      console.error('Exchange error:', error);
+      const errorMessage = (error as any)?.message || 'Something went wrong';
+      toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+      setExchangeStep('ready');
     } finally {
-      setIsLoading(false);
+      setIsExchanging(false);
     }
   };
 
-
-
-  // Fetch balances when wallet connects
+  // Fetch user's coins when connected
   useEffect(() => {
-    const fetchBalances = async () => {
-      if (!address || !wagmiIsConnected) return;
+    const getCoinBalances = async () => {
+      if (!address || !walletConnected) return;
       
       try {
-        // This would typically call an API or contract to get balances
-        // For now, we'll use the balances from the store
-        console.log('Fetching balances for address:', address);
+        console.log('Getting coin balances for:', address);
       } catch (error) {
-        console.error('Error fetching balances:', error);
-        setBalancesError('Failed to fetch balances');
+        console.error('Error getting balances:', error);
+        setBalancesError('Failed to get your coin balances');
       }
     };
 
-    fetchBalances();
-    // Set up polling every 10 seconds
-    const interval = setInterval(fetchBalances, 10000);
+    getCoinBalances();
+    const interval = setInterval(getCoinBalances, 10000);
     return () => clearInterval(interval);
-  }, [address, wagmiIsConnected, setBalances, setBalancesError]);
+  }, [address, walletConnected, setBalances, setBalancesError]);
 
-  // Listen for AI events from trending tokens
+  // Listen for assistant events
   useEffect(() => {
-    const handleAIEvent = (event: CustomEvent) => {
-      setAiQuery(event.detail.query);
-      setShowAIDialog(true);
+    const handleAssistantEvent = (event: CustomEvent) => {
+      setAssistantQuery(event.detail.query);
+      setShowMagicAssistant(true);
     };
 
-    window.addEventListener('openAI', handleAIEvent as EventListener);
-    return () => window.removeEventListener('openAI', handleAIEvent as EventListener);
+    window.addEventListener('openAI', handleAssistantEvent as EventListener);
+    return () => window.removeEventListener('openAI', handleAssistantEvent as EventListener);
   }, []);
 
-  // Get user's available tokens and format amounts properly
-  const userTokens = balances.map(b => ({
+  // Get user's available coins
+  const userCoins = balances.map(b => ({
     ...b,
     displayAmount: formatFromDecimals(b.amount, b.decimals),
-    usdValue: getUSDValue(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
+    dollarValue: getValueInDollars(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
   })).filter(b => parseFloat(b.displayAmount) > 0);
 
-  // Get token balances and prices
-  const tokenInBalance = balances.find(b => {
-    // For native SEI token
-    if (tokenIn === 'SEI' && b.token === 'native') {
-      return true;
-    }
-    // For other tokens, match by address
-    const tokenData = allTokens.find(t => t.symbol === tokenIn);
-    return tokenData && b.token === tokenData.address;
+  // Get coin balances
+  const fromCoinBalance = balances.find(b => {
+    if (fromCoin === 'SEI' && b.token === 'native') return true;
+    const coinData = allCoins.find(c => c.symbol === fromCoin);
+    return coinData && b.token === coinData.address;
   })?.amount || '0';
   
-  const tokenOutBalance = balances.find(b => {
-    // For native SEI token
-    if (tokenOut === 'SEI' && b.token === 'native') {
-      return true;
-    }
-    // For other tokens, match by address
-    const tokenData = allTokens.find(t => t.symbol === tokenOut);
-    return tokenData && b.token === tokenData.address;
+  const toCoinBalance = balances.find(b => {
+    if (toCoin === 'SEI' && b.token === 'native') return true;
+    const coinData = allCoins.find(c => c.symbol === toCoin);
+    return coinData && b.token === coinData.address;
   })?.amount || '0';
   
-  // Get the decimals for proper formatting
-  const tokenInData = allTokens.find(t => t.symbol === tokenIn);
-  const tokenOutData = allTokens.find(t => t.symbol === tokenOut);
-  const tokenInDecimals = tokenInData?.address === 'native' ? 18 : 18; // Default to 18 for ERC20
-  const tokenOutDecimals = tokenOutData?.address === 'native' ? 18 : 18; // Default to 18 for ERC20
+  const fromCoinData = allCoins.find(c => c.symbol === fromCoin);
+  const toCoinData = allCoins.find(c => c.symbol === toCoin);
+  const fromDecimals = fromCoinData?.address === 'native' ? 18 : 18;
+  const toDecimals = toCoinData?.address === 'native' ? 18 : 18;
   
-  // Format balances properly
-  const formattedTokenInBalance = formatFromDecimals(tokenInBalance, tokenInDecimals);
-  const formattedTokenOutBalance = formatFromDecimals(tokenOutBalance, tokenOutDecimals);
+  const formattedFromBalance = formatFromDecimals(fromCoinBalance, fromDecimals);
+  const formattedToBalance = formatFromDecimals(toCoinBalance, toDecimals);
   
-  // Look up prices by token address
-  const priceIn = tokenInData ? tokenPrices[tokenInData.address.toLowerCase()] || 0 : 0;
-  const priceOut = tokenOutData ? tokenPrices[tokenOutData.address.toLowerCase()] || 0 : 0;
+  const priceFrom = fromCoinData ? tokenPrices[fromCoinData.address.toLowerCase()] || 0 : 0;
+  const priceTo = toCoinData ? tokenPrices[toCoinData.address.toLowerCase()] || 0 : 0;
 
-  // console.log('Token balances:', { tokenInBalance, tokenOutBalance });
-  // console.log('Formatted balances:', { formattedTokenInBalance, formattedTokenOutBalance });
-  // console.log('Token prices:', { 
-  //   tokenIn, 
-  //   tokenOut, 
-  //   priceIn, 
-  //   priceOut,
-  //   tokenPrices,
-  //   tokenInData: tokenInData?.address,
-  //   tokenOutData: tokenOutData?.address,
-  //   tokenInLower: tokenInData?.address?.toLowerCase(),
-  //   tokenOutLower: tokenOutData?.address?.toLowerCase()
-  // });
-  // console.log('Raw balance values:', { 
-  //   tokenInBalance, 
-  //   tokenOutBalance, 
-  //   tokenInBalanceType: typeof tokenInBalance,
-  //   tokenOutBalanceType: typeof tokenOutBalance 
-  // });
-
-  const handleAIQuery = async () => {
-    if (!aiQuery.trim()) return;
+  const handleAssistantQuery = async () => {
+    if (!assistantQuery.trim()) return;
     
     try {
       const response = await fetch('/api/baruk-chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: aiQuery,
+          message: assistantQuery,
           walletAddress: address,
         }),
       });
       
       const data = await response.json();
-      console.log('AI Response:', data);
-      toast.success('AI query processed! Check console for response.');
-      setAiQuery('');
-      setShowAIDialog(false);
+      console.log('Magic Assistant Response:', data);
+      toast.success('✨ Your magic assistant helped you! Check the console for details.');
+      setAssistantQuery('');
+      setShowMagicAssistant(false);
     } catch (error) {
-      console.error('AI query error:', error);
-      toast.error('Failed to process AI query');
+      console.error('Assistant error:', error);
+      toast.error('Your magic assistant is taking a break. Try again!');
     }
   };
 
-  // Format liquidity values
-  const formatLiquidityValue = (value: bigint | undefined) => {
+  const formatEarningsValue = (value: bigint | undefined) => {
     if (!value) return '0';
     try {
       return formatUnits(value, 18);
@@ -374,299 +300,386 @@ export default function TradePage() {
     }
   };
 
-  // Calculate user's share of the pool
-  const calculatePoolShare = () => {
+  const calculateMyShare = () => {
     if (!liquidityBalance || !totalLiquidity) return '0.00';
     try {
-      const userBalance = Number(formatUnits(liquidityBalance, 18));
+      const myBalance = Number(formatUnits(liquidityBalance, 18));
       const total = Number(formatUnits(totalLiquidity, 18));
       if (total === 0) return '0.00';
-      return ((userBalance / total) * 100).toFixed(4);
+      return ((myBalance / total) * 100).toFixed(4);
     } catch {
       return '0.00';
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto mt-10 px-4">
-      {/* Welcome Message for New Users */}
+    <div className="max-w-6xl mx-auto mt-6 px-4">
+      {/* Welcome Section for New Users */}
       {!address && (
         <motion.div 
-          className="mb-8 p-6 rounded-xl bg-gradient-to-r from-purple-900/50 to-blue-900/50 border border-purple-500/30"
+          className="mb-8 p-8 rounded-2xl bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-400/40 text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <h2 className="text-2xl font-bold text-white mb-3">👋 Welcome to Baruk Swap!</h2>
-          <p className="text-gray-300">Connect your wallet to start swapping tokens with just a few clicks. No complicated forms, just magic! ✨</p>
+          <div className="text-6xl mb-4">🪄</div>
+          <h1 className="text-3xl font-bold text-white mb-4">Welcome to Magic Coin Exchange!</h1>
+          <p className="text-lg text-gray-300 mb-6">
+            Exchange any coin for any other coin instantly, like magic! ✨
+          </p>
+          <p className="text-gray-400">
+            Connect your digital wallet to start exchanging coins and earning rewards!
+          </p>
         </motion.div>
       )}
 
+      {/* Celebration Animation */}
+      <AnimatePresence>
+        {showCelebration && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="text-8xl"
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, 10, -10, 0],
+              }}
+              transition={{ duration: 0.5, repeat: 3 }}
+            >
+              🎉
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-
-      <div className="grid md:grid-cols-[1fr,380px] gap-8">
-        {/* Main Swap Interface */}
+      <div className="grid lg:grid-cols-[1fr,320px] gap-8">
+        {/* Main Exchange Interface */}
         <motion.div
-          className="relative p-8 rounded-2xl bg-gradient-to-b from-purple-900/40 to-blue-900/40 border border-purple-500/30 backdrop-blur-sm shadow-xl"
+          className="relative p-8 rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm shadow-2xl"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          {/* Beginner-friendly instructions */}
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              Swap Tokens Magically ✨
-            </h1>
-            <p className="text-gray-300 text-sm">
-              Just choose your tokens, enter an amount, and click swap. It&apos;s that simple!
+          <div className="mb-8 text-center">
+            <div className="text-4xl mb-3">💱</div>
+            <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Instant Coin Exchange
+            </h2>
+            <p className="text-gray-300">
+              Get the best rates automatically. No hidden fees, just magic! ✨
             </p>
           </div>
 
-          {/* Token Input */}
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-white/5 border border-purple-500/20">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-400">You Pay</span>
-                <span className="text-sm text-gray-400">
-                  Balance: {formattedTokenInBalance}
+          {/* Exchange Interface */}
+          <div className="space-y-6">
+            {/* From Coin */}
+            <motion.div 
+              className="p-6 rounded-xl bg-white/10 border border-purple-400/30 backdrop-blur-sm"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex justify-between mb-3">
+                <span className="text-gray-300 font-medium">You Give</span>
+                <span className="text-gray-300">
+                  Available: {formattedFromBalance}
                 </span>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
                 <input
                   type="number"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0.0"
-                  className="flex-1 bg-transparent text-2xl font-medium focus:outline-none"
+                  className="flex-1 bg-transparent text-3xl font-bold focus:outline-none text-white placeholder-gray-500"
                 />
                 <TokenSelector
-                  value={tokenIn}
-                  onChange={setTokenIn}
-                  tokens={allTokens}
-                  className="min-w-[120px]"
+                  value={fromCoin}
+                  onChange={setFromCoin}
+                  tokens={allCoins}
+                  className="min-w-[140px] bg-purple-600/30 hover:bg-purple-600/50"
                 />
               </div>
-              <div className="mt-1 text-sm text-gray-500">
-                ≈ ${getUSDValue(amount, priceIn)}
+              <div className="mt-2 text-lg text-purple-300">
+                ≈ ${getValueInDollars(amount, priceFrom)}
               </div>
-            </div>
+            </motion.div>
 
-            {/* Swap Direction Button */}
+            {/* Swap Button */}
             <div className="flex justify-center">
-              <button
+              <motion.button
                 onClick={() => {
-                  setTokenIn(tokenOut);
-                  setTokenOut(tokenIn);
+                  setFromCoin(toCoin);
+                  setToCoin(fromCoin);
                 }}
-                className="p-2 rounded-full bg-purple-500/20 hover:bg-purple-500/30 transition-colors"
+                className="p-3 rounded-full bg-gradient-to-r from-purple-600/40 to-pink-600/40 hover:from-purple-500/50 hover:to-pink-500/50 transition-all border border-purple-400/30"
+                whileHover={{ scale: 1.1, rotate: 180 }}
+                whileTap={{ scale: 0.9 }}
               >
-                <ArrowsRightLeftIcon className="h-6 w-6 text-purple-400" />
-              </button>
+                <ArrowsRightLeftIcon className="h-6 w-6 text-purple-300" />
+              </motion.button>
             </div>
 
-            {/* Token Output */}
-            <div className="p-4 rounded-xl bg-white/5 border border-purple-500/20">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm text-gray-400">You Receive</span>
-                <span className="text-sm text-gray-400">
-                  Balance: {formattedTokenOutBalance}
+            {/* To Coin */}
+            <motion.div 
+              className="p-6 rounded-xl bg-white/10 border border-green-400/30 backdrop-blur-sm"
+              whileHover={{ scale: 1.02 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex justify-between mb-3">
+                <span className="text-gray-300 font-medium">You Get</span>
+                <span className="text-gray-300">
+                  Available: {formattedToBalance}
                 </span>
               </div>
-              <div className="flex gap-4">
-                <div className="flex-1 text-2xl font-medium text-gray-400">
-                  {amount ? calculateReceiveAmount(amount, priceIn, priceOut) : '0.0'}
+              <div className="flex gap-4 items-center">
+                <div className="flex-1 text-3xl font-bold text-green-400">
+                  {amount ? calculateExchangeAmount(amount, priceFrom, priceTo) : '0.0'}
                 </div>
                 <TokenSelector
-                  value={tokenOut}
-                  onChange={setTokenOut}
-                  tokens={allTokens}
-                  className="min-w-[120px]"
+                  value={toCoin}
+                  onChange={setToCoin}
+                  tokens={allCoins}
+                  className="min-w-[140px] bg-green-600/30 hover:bg-green-600/50"
                 />
               </div>
-              <div className="mt-1 text-sm text-gray-500">
-                ≈ ${getUSDValue(amount, priceOut)}
+              <div className="mt-2 text-lg text-green-300">
+                ≈ ${getValueInDollars(calculateExchangeAmount(amount, priceFrom, priceTo), priceTo)}
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Swap Button */}
-          <button
-            onClick={handleTrade}
-            disabled={!wagmiIsConnected || !amount || isLoading}
-            className={`w-full mt-6 py-4 rounded-xl text-lg font-semibold transition-all
-              ${!wagmiIsConnected || !amount || isLoading
-                ? 'bg-purple-900/50 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white'
+          {/* Exchange Stats */}
+          {amount && (
+            <motion.div 
+              className="mt-6 p-4 rounded-xl bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-400/20"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+            >
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-green-400 font-bold">✨ Great Rate</div>
+                  <div className="text-sm text-gray-400">Best available</div>
+                </div>
+                <div>
+                  <div className="text-blue-400 font-bold">⚡ Instant</div>
+                  <div className="text-sm text-gray-400">Under 30 seconds</div>
+                </div>
+                <div>
+                  <div className="text-purple-400 font-bold">🔒 Safe</div>
+                  <div className="text-sm text-gray-400">100% secure</div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Main Action Button */}
+          <motion.button
+            onClick={handleExchange}
+            disabled={!walletConnected || !amount || isExchanging || exchangeStep === 'processing'}
+            className={`w-full mt-8 py-5 rounded-xl text-xl font-bold transition-all relative overflow-hidden
+              ${!walletConnected || !amount || isExchanging
+                ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl'
               }`}
+            whileHover={!isExchanging ? { scale: 1.02 } : {}}
+            whileTap={!isExchanging ? { scale: 0.98 } : {}}
           >
-            {!wagmiIsConnected
-              ? 'Connect Wallet'
-              : isLoading
-              ? 'Swapping... ✨'
-              : 'Swap Now 🪄'}
-          </button>
+            {!walletConnected
+              ? '🔗 Connect Your Wallet First'
+              : exchangeStep === 'processing'
+              ? '✨ Creating Magic...'
+              : exchangeStep === 'success'
+              ? '🎉 Exchange Successful!'
+              : isExchanging
+              ? '⚡ Exchanging...'
+              : '🪄 Make the Exchange!'}
+              
+            {exchangeStep === 'processing' && (
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                animate={{ x: ['-100%', '100%'] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
         </motion.div>
 
-        {/* Sidebar: Your Tokens & Liquidity */}
+        {/* Sidebar */}
         <motion.div
           className="space-y-6"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          {/* Your Liquidity Positions */}
+          {/* Your Earnings */}
           {address && (
-            <div className="p-6 rounded-xl bg-gradient-to-b from-green-900/40 to-emerald-900/40 border border-green-500/30">
-              <h2 className="text-lg font-semibold mb-4">Your Liquidity 💧</h2>
+            <div className="p-6 rounded-xl bg-gradient-to-b from-green-900/50 to-emerald-900/50 border border-green-400/40">
+              <div className="text-center mb-4">
+                <div className="text-3xl mb-2">💰</div>
+                <h3 className="text-xl font-bold text-green-400">Your Earnings</h3>
+              </div>
+              
               {isUserDataLoading ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin h-6 w-6 border-2 border-green-400 border-t-transparent rounded-full mx-auto"></div>
-                  <p className="text-gray-400 mt-2">Loading positions...</p>
+                <div className="text-center py-6">
+                  <div className="animate-spin h-8 w-8 border-2 border-green-400 border-t-transparent rounded-full mx-auto mb-3"></div>
+                  <p className="text-gray-400">Loading your earnings...</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
-                    <span className="text-gray-400">Pool Share</span>
-                    <span className="text-green-400 font-semibold">{calculatePoolShare()}%</span>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-white/10 text-center">
+                    <div className="text-2xl font-bold text-green-400">${totalSavings.toFixed(2)}</div>
+                    <p className="text-sm text-gray-400">Total Savings</p>
                   </div>
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
-                    <span className="text-gray-400">Your Liquidity</span>
-                    <span className="text-white font-semibold">{formatLiquidityValue(liquidityBalance)}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
-                    <span className="text-gray-400">LP Rewards</span>
-                    <span className="text-yellow-400 font-semibold">{formatLiquidityValue(lpRewards)}</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 rounded-lg bg-white/5">
-                    <span className="text-gray-400">LP Tokens</span>
-                    <span className="text-blue-400 font-semibold">{formatLiquidityValue(balanceOf)}</span>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-lg bg-white/5 text-center">
+                      <div className="text-lg font-bold text-yellow-400">{formatEarningsValue(lpRewards)}</div>
+                      <p className="text-xs text-gray-400">Rewards</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-white/5 text-center">
+                      <div className="text-lg font-bold text-blue-400">{calculateMyShare()}%</div>
+                      <p className="text-xs text-gray-400">Pool Share</p>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Your Tokens Section */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-purple-900/40 to-blue-900/40 border border-purple-500/30">
-            <h2 className="text-lg font-semibold mb-4">Your Magic Tokens ✨</h2>
-            {userTokens.length > 0 ? (
+          {/* Your Coins */}
+          <div className="p-6 rounded-xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40">
+            <div className="flex items-center gap-2 mb-4">
+              <CurrencyDollarIcon className="h-6 w-6 text-purple-400" />
+              <h3 className="text-xl font-bold">Your Coins</h3>
+            </div>
+            
+            {userCoins.length > 0 ? (
               <div className="space-y-3">
-                {userTokens.map(token => (
-                  <div key={token.token} className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors">
+                {userCoins.slice(0, 4).map(coin => (
+                  <motion.div 
+                    key={coin.token} 
+                    className="flex items-center justify-between p-4 rounded-lg bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
+                    whileHover={{ scale: 1.02 }}
+                  >
                     <div>
-                      <div className="font-medium">{token.symbol}</div>
-                      <div className="text-sm text-gray-400">{token.displayAmount}</div>
+                      <div className="font-bold text-white">{coin.symbol}</div>
+                      <div className="text-sm text-gray-400">{formatCoinBalance(coin.displayAmount)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-sm text-gray-400">
-                        ${token.usdValue}
-                      </div>
+                      <div className="text-purple-400 font-semibold">${coin.dollarValue}</div>
+                      <button 
+                        onClick={() => setFromCoin(coin.symbol)}
+                        className="text-xs text-purple-300 hover:text-purple-200"
+                      >
+                        Use This
+                      </button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <SparklesIcon className="h-12 w-12 text-purple-400 mx-auto mb-4" />
-                <p className="text-gray-400">No tokens found</p>
-                <p className="text-sm text-gray-500 mt-2">Connect your wallet to see your tokens</p>
+              <div className="text-center py-6">
+                <div className="text-4xl mb-3">🪙</div>
+                <p className="text-gray-400">No coins yet</p>
+                <p className="text-sm text-gray-500">Connect wallet to see your coins</p>
               </div>
             )}
           </div>
 
-          {/* AI Agent Integration */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-pink-900/40 to-purple-900/40 border border-pink-500/30">
-            <h2 className="text-lg font-semibold mb-4">AI Trading Assistant 🤖</h2>
+          {/* Magic Assistant */}
+          <div className="p-6 rounded-xl bg-gradient-to-b from-pink-900/50 to-purple-900/50 border border-pink-400/40">
+            <div className="flex items-center gap-2 mb-4">
+              <SparklesIcon className="h-6 w-6 text-pink-400" />
+              <h3 className="text-xl font-bold">Magic Assistant</h3>
+            </div>
+            
             <div className="space-y-3">
               <button 
-                onClick={() => setShowAIDialog(!showAIDialog)}
-                className="w-full p-3 rounded-lg bg-pink-600/20 hover:bg-pink-600/30 transition-colors text-left"
+                onClick={() => setShowMagicAssistant(!showMagicAssistant)}
+                className="w-full p-4 rounded-lg bg-pink-600/30 hover:bg-pink-600/40 transition-all text-left"
               >
-                <div className="font-medium">Ask AI Agent</div>
-                <div className="text-sm text-gray-400">Get trading insights & execute trades</div>
+                <div className="font-bold text-pink-300">🤖 Ask for Help</div>
+                <div className="text-sm text-gray-400">Get personalized coin advice</div>
               </button>
               
-              {showAIDialog && (
-                <div className="space-y-3">
+              {showMagicAssistant && (
+                <motion.div 
+                  className="space-y-3"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                >
                   <textarea
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    placeholder="Ask about trending tokens, optimal swaps, or request trades..."
-                    className="w-full p-3 rounded-lg bg-white/5 border border-pink-500/20 text-white placeholder-gray-400 resize-none"
+                    value={assistantQuery}
+                    onChange={(e) => setAssistantQuery(e.target.value)}
+                    placeholder="What coins should I buy? Which ones are trending? Help me make money!"
+                    className="w-full p-3 rounded-lg bg-white/10 border border-pink-400/30 text-white placeholder-gray-500 resize-none"
                     rows={3}
                   />
                   <div className="flex gap-2">
                     <button
-                      onClick={handleAIQuery}
-                      disabled={!aiQuery.trim()}
-                      className="flex-1 py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-colors text-sm font-medium"
+                      onClick={handleAssistantQuery}
+                      disabled={!assistantQuery.trim()}
+                      className="flex-1 py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-all text-sm font-bold"
                     >
-                      Ask AI
+                      ✨ Get Advice
                     </button>
                     <button
-                      onClick={() => setShowAIDialog(false)}
-                      className="py-2 px-4 rounded-lg bg-gray-600/20 hover:bg-gray-600/30 transition-colors text-sm"
+                      onClick={() => setShowMagicAssistant(false)}
+                      className="py-2 px-4 rounded-lg bg-gray-600/30 hover:bg-gray-600/40 transition-all text-sm"
                     >
-                      Cancel
+                      Close
                     </button>
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
           </div>
 
-          {/* Pool Stats */}
-          {!isReservesLoading && reserves && (
-            <div className="p-6 rounded-xl bg-gradient-to-b from-blue-900/40 to-cyan-900/40 border border-blue-500/30">
-              <h2 className="text-lg font-semibold mb-4">Pool Statistics 📊</h2>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Total Liquidity</span>
-                  <span className="text-white font-semibold">{formatLiquidityValue(totalLiquidity)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">LP Fee</span>
-                  <span className="text-green-400 font-semibold">{lpFeeBps ? Number(lpFeeBps) / 100 : 0}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Reserve 0</span>
-                  <span className="text-blue-400 font-semibold">{Array.isArray(reserves) ? formatUnits(reserves[0], 18) : '0'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Reserve 1</span>
-                  <span className="text-purple-400 font-semibold">{Array.isArray(reserves) ? formatUnits(reserves[1], 18) : '0'}</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Trending Tokens */}
+          {/* Hot Coins */}
           <TrendingTokens />
 
           {/* Quick Actions */}
-          <div className="p-6 rounded-xl bg-gradient-to-b from-indigo-900/40 to-purple-900/40 border border-indigo-500/30">
-            <h2 className="text-lg font-semibold mb-4">Quick Actions ⚡</h2>
+          <div className="p-6 rounded-xl bg-gradient-to-b from-indigo-900/50 to-purple-900/50 border border-indigo-400/40">
+            <div className="flex items-center gap-2 mb-4">
+              <FireIcon className="h-6 w-6 text-indigo-400" />
+              <h3 className="text-xl font-bold">Quick Actions</h3>
+            </div>
+            
             <div className="space-y-3">
-              <button 
+              <motion.button 
                 onClick={() => window.location.href = '/liquidity'}
-                className="w-full p-3 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 transition-colors text-left"
+                className="w-full p-4 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 transition-all text-left"
+                whileHover={{ scale: 1.02 }}
               >
-                <div className="font-medium">Add Liquidity</div>
-                <div className="text-sm text-gray-400">Earn fees by providing liquidity</div>
-              </button>
-              <button 
-                onClick={() => window.location.href = '/pools'}
-                className="w-full p-3 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-colors text-left"
+                <div className="font-bold text-indigo-300">💧 Earn Money</div>
+                <div className="text-sm text-gray-400">Put your coins to work and earn daily</div>
+              </motion.button>
+              
+              <motion.button 
+                onClick={() => setAssistantQuery('What are the best coins to buy right now?')}
+                className="w-full p-4 rounded-lg bg-green-600/30 hover:bg-green-600/40 transition-all text-left"
+                whileHover={{ scale: 1.02 }}
               >
-                <div className="font-medium">View All Pools</div>
-                <div className="text-sm text-gray-400">Explore liquidity pools</div>
-              </button>
-              <button 
-                onClick={() => setAiQuery('What are the trending tokens I should buy?')}
-                className="w-full p-3 rounded-lg bg-green-600/20 hover:bg-green-600/30 transition-colors text-left"
+                <div className="font-bold text-green-300">🔥 Hot Tips</div>
+                <div className="text-sm text-gray-400">Get AI-powered investment advice</div>
+              </motion.button>
+              
+              <motion.button 
+                onClick={() => {
+                  const coins = ['TOKEN0', 'TOKEN1', 'TOKEN2'];
+                  const randomCoin = coins[Math.floor(Math.random() * coins.length)];
+                  setToCoin(randomCoin);
+                  toast.success(`✨ How about trying ${randomCoin}? It's looking good!`);
+                }}
+                className="w-full p-4 rounded-lg bg-purple-600/30 hover:bg-purple-600/40 transition-all text-left"
+                whileHover={{ scale: 1.02 }}
               >
-                <div className="font-medium">AI Trading Tips</div>
-                <div className="text-sm text-gray-400">Get personalized advice</div>
-              </button>
+                <div className="font-bold text-purple-300">🎲 Surprise Me</div>
+                <div className="text-sm text-gray-400">Pick a random coin for me</div>
+              </motion.button>
             </div>
           </div>
         </motion.div>
