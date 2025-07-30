@@ -1,0 +1,68 @@
+ompiling /swap ...
+ ✓ Compiled /swap in 28.6s
+ ⨯ ./src/app/components/TrendingTokens.tsx:5:1
+Export TrendingDownIcon doesn't exist in target module
+  3 | import { useState, useEffect } from 'react';
+  4 | import { motion } from 'framer-motion';
+> 5 | import { TrendingUpIcon, TrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { useAppStore } from '../store/useAppStore';
+  7 |
+  8 | interface TrendingToken {
+
+The export TrendingDownIcon was not found in module [project]/node_modules/@heroicons/react/24/outline/esm/index.js [app-client] (ecmascript) <exports>.
+Did you mean to import ArrowTrendingDownIcon?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+
+./src/app/components/TrendingTokens.tsx:5:1
+Export TrendingDownIcon doesn't exist in target module
+  3 | import { useState, useEffect } from 'react';
+  4 | import { motion } from 'framer-motion';
+> 5 | import { TrendingUpIcon, TrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { useAppStore } from '../store/useAppStore';
+  7 |
+  8 | interface TrendingToken {
+
+The export TrendingDownIcon was not found in module [project]/node_modules/@heroicons/react/24/outline/esm/index.js [app-ssr] (ecmascript) <exports>.
+Did you mean to import ArrowTrendingDownIcon?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+
+./src/app/components/TrendingTokens.tsx:5:1
+Export TrendingUpIcon doesn't exist in target module
+  3 | import { useState, useEffect } from 'react';
+  4 | import { motion } from 'framer-motion';
+> 5 | import { TrendingUpIcon, TrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { useAppStore } from '../store/useAppStore';
+  7 |
+  8 | interface TrendingToken {
+
+The export TrendingUpIcon was not found in module [project]/node_modules/@heroicons/react/24/outline/esm/index.js [app-client] (ecmascript) <exports>.
+Did you mean to import ArrowTrendingUpIcon?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+
+./src/app/components/TrendingTokens.tsx:5:1
+Export TrendingUpIcon doesn't exist in target module
+  3 | import { useState, useEffect } from 'react';
+  4 | import { motion } from 'framer-motion';
+> 5 | import { TrendingUpIcon, TrendingDownIcon, SparklesIcon } from '@heroicons/react/24/outline';
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 | import { useAppStore } from '../store/useAppStore';
+  7 |
+  8 | interface TrendingToken {
+
+The export TrendingUpIcon was not found in module [project]/node_modules/@heroicons/react/24/outline/esm/index.js [app-ssr] (ecmascript) <exports>.
+Did you mean to import ArrowTrendingUpIcon?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 3.3s
+ GET /swap 500 in 32285ms
