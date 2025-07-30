@@ -23,11 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }} />
             <div className="flex min-h-screen">
               <Sidebar />
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col min-w-0">
                 <Topbar />
                 <BalanceWatcher />
                 <TokenPriceWatcher />
-                <main className="flex-1 p-6">{children}</main>
+                <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-hidden">{children}</main>
                 <AIOrb />
               </div>
             </div>

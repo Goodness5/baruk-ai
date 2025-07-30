@@ -276,13 +276,20 @@ export default function ExchangePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: assistantQuery,
-          walletAddress: address,
+          userId: address,
         }),
       });
       
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        toast.error(`Assistant error: ${errorData.error || 'Request failed'}`);
+        return;
+      }
+      
       const data = await response.json();
       console.log('Magic Assistant Response:', data);
-      toast.success('✨ Your magic assistant helped you! Check the console for details.');
+      toast.success('✨ Your magic assistant helped you!');
       setAssistantQuery('');
       setShowMagicAssistant(false);
     } catch (error) {
@@ -313,20 +320,20 @@ export default function ExchangePage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto mt-6 px-4">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6">
       {/* Welcome Section for New Users */}
       {!address && (
         <motion.div 
-          className="mb-8 p-8 rounded-2xl bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-400/40 text-center"
+          className="mb-4 sm:mb-6 p-4 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-400/40 text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div className="text-6xl mb-4">🪄</div>
-          <h1 className="text-3xl font-bold text-white mb-4">Welcome to Magic Money Exchange!</h1>
-          <p className="text-lg text-gray-300 mb-6">
+          <div className="text-4xl sm:text-5xl lg:text-6xl mb-2 sm:mb-4">🪄</div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-2 sm:mb-4">Welcome to Magic Money Exchange!</h1>
+          <p className="text-sm sm:text-base lg:text-lg text-gray-300 mb-3 sm:mb-6">
             Exchange any digital asset for any other asset instantly, like magic! ✨
           </p>
-          <p className="text-gray-400">
+          <p className="text-xs sm:text-sm text-gray-400">
             Connect your digital wallet to start exchanging assets and earning rewards!
           </p>
         </motion.div>
@@ -355,54 +362,54 @@ export default function ExchangePage() {
         )}
       </AnimatePresence>
 
-      <div className="grid lg:grid-cols-[1fr,320px] gap-8">
+      <div className="grid lg:grid-cols-[1fr,300px] xl:grid-cols-[1fr,320px] gap-4 sm:gap-6 lg:gap-8">
         {/* Main Exchange Interface */}
         <motion.div
-          className="relative p-8 rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm shadow-2xl"
+          className="relative p-4 sm:p-6 lg:p-8 rounded-xl sm:rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm shadow-2xl"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="mb-8 text-center">
-            <div className="text-4xl mb-3">💱</div>
-            <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
+            <div className="text-3xl sm:text-4xl mb-2 sm:mb-3">💱</div>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               Instant Money Exchange
             </h2>
-            <p className="text-gray-300">
+            <p className="text-sm sm:text-base text-gray-300">
               Get the best rates automatically. No hidden fees, just magic! ✨
             </p>
           </div>
 
           {/* Exchange Interface */}
-          <div className="space-y-6">
-            {/* From Coin */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* From Asset */}
             <motion.div 
-              className="p-6 rounded-xl bg-white/10 border border-purple-400/30 backdrop-blur-sm"
-              whileHover={{ scale: 1.02 }}
+              className="p-4 sm:p-6 rounded-xl bg-white/10 border border-purple-400/30 backdrop-blur-sm"
+              whileHover={{ scale: 1.01 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="flex justify-between mb-3">
-                <span className="text-gray-300 font-medium">You Give</span>
-                <span className="text-gray-300">
+              <div className="flex justify-between mb-2 sm:mb-3">
+                <span className="text-gray-300 font-medium text-sm sm:text-base">You Give</span>
+                <span className="text-gray-300 text-xs sm:text-sm">
                   Available: {formattedFromBalance}
                 </span>
               </div>
-              <div className="flex gap-4 items-center">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
                 <input
                   type="number"
                   value={amount}
                   onChange={e => setAmount(e.target.value)}
                   placeholder="0.0"
-                  className="flex-1 bg-transparent text-3xl font-bold focus:outline-none text-white placeholder-gray-500"
+                  className="flex-1 bg-transparent text-2xl sm:text-3xl font-bold focus:outline-none text-white placeholder-gray-500 w-full"
                 />
                 <TokenSelector
                   value={fromAsset}
                   onChange={setFromAsset}
                   tokens={allAssets}
-                  className="min-w-[140px] bg-purple-600/30 hover:bg-purple-600/50"
+                  className="w-full sm:min-w-[140px] sm:w-auto bg-purple-600/30 hover:bg-purple-600/50"
                 />
               </div>
-              <div className="mt-2 text-lg text-purple-300">
+              <div className="mt-2 text-base sm:text-lg text-purple-300">
                 ≈ ${getValueInDollars(amount, priceFrom)}
               </div>
             </motion.div>
@@ -422,30 +429,30 @@ export default function ExchangePage() {
               </motion.button>
             </div>
 
-            {/* To Coin */}
+            {/* To Asset */}
             <motion.div 
-              className="p-6 rounded-xl bg-white/10 border border-green-400/30 backdrop-blur-sm"
-              whileHover={{ scale: 1.02 }}
+              className="p-4 sm:p-6 rounded-xl bg-white/10 border border-green-400/30 backdrop-blur-sm"
+              whileHover={{ scale: 1.01 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="flex justify-between mb-3">
-                <span className="text-gray-300 font-medium">You Get</span>
-                <span className="text-gray-300">
+              <div className="flex justify-between mb-2 sm:mb-3">
+                <span className="text-gray-300 font-medium text-sm sm:text-base">You Get</span>
+                <span className="text-gray-300 text-xs sm:text-sm">
                   Available: {formattedToBalance}
                 </span>
               </div>
-              <div className="flex gap-4 items-center">
-                <div className="flex-1 text-3xl font-bold text-green-400">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+                <div className="flex-1 text-2xl sm:text-3xl font-bold text-green-400 w-full">
                   {amount ? calculateExchangeAmount(amount, priceFrom, priceTo) : '0.0'}
                 </div>
                 <TokenSelector
                   value={toAsset}
                   onChange={setToAsset}
                   tokens={allAssets}
-                  className="min-w-[140px] bg-green-600/30 hover:bg-green-600/50"
+                  className="w-full sm:min-w-[140px] sm:w-auto bg-green-600/30 hover:bg-green-600/50"
                 />
               </div>
-              <div className="mt-2 text-lg text-green-300">
+              <div className="mt-2 text-base sm:text-lg text-green-300">
                 ≈ ${getValueInDollars(calculateExchangeAmount(amount, priceFrom, priceTo), priceTo)}
               </div>
             </motion.div>
@@ -509,7 +516,7 @@ export default function ExchangePage() {
 
         {/* Sidebar */}
         <motion.div
-          className="space-y-6"
+          className="space-y-3 sm:space-y-4 lg:space-y-6"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
