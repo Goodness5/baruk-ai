@@ -2,7 +2,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowsRightLeftIcon, SparklesIcon, CurrencyDollarIcon, TrendingUpIcon, StarIcon, FireIcon } from '@heroicons/react/24/outline';
+import { ArrowsRightLeftIcon, SparklesIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/outline';
 import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
@@ -22,16 +22,12 @@ const DEFAULT_PROTOCOL_ID = 'baruk';
 export default function ExchangePage() {
   const { address, isConnected: walletConnected } = useAccount();
   const balances = useAppStore(s => s.balances);
-  const balancesLoading = useAppStore(s => s.balancesLoading);
-  const balancesError = useAppStore(s => s.balancesError);
-  const setBalances = useAppStore(s => s.setBalances);
-  const setBalancesError = useAppStore(s => s.setBalancesError);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
   
   // Pool and earning data
-  const { reserves, totalLiquidity, lpFeeBps, isReservesLoading } = useBarukAMM();
-  const { liquidityBalance, lpRewards, balanceOf, isLoading: isUserDataLoading } = useUserAMMData(address);
+  const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
+  const { liquidityBalance, lpRewards } = useUserAMMData(address);
 
   const [fromAsset, setFromAsset] = useState('TOKEN0');
   const [toAsset, setToAsset] = useState('TOKEN1');
@@ -40,7 +36,7 @@ export default function ExchangePage() {
   const [showMagicAssistant, setShowMagicAssistant] = useState(false);
   const [assistantQuery, setAssistantQuery] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
-  const [exchangeStep, setExchangeStep] = useState('ready'); // ready, processing, success
+  const [exchangeStep, setExchangeStep] = useState('ready');
   const [totalSavings, setTotalSavings] = useState(0);
 
   // Get available assets
@@ -52,7 +48,7 @@ export default function ExchangePage() {
     ...protocolAssets.map(asset => ({ ...asset, name: asset.symbol }))
   ];
 
-  // Helper to format large numbers nicely
+  // Helper functions
   const formatFromDecimals = (amount: string, decimals: number) => {
     try {
       const value = BigInt(amount);
@@ -82,7 +78,6 @@ export default function ExchangePage() {
     return (num * price).toFixed(2);
   };
 
-  // Calculate how much you'll receive
   const calculateExchangeAmount = (amount: string, priceFrom: number, priceTo: number): string => {
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) return '0.0';
@@ -91,7 +86,6 @@ export default function ExchangePage() {
       if (fromAsset === toAsset) {
         return amountNum.toFixed(6);
       } else {
-        // Use demo prices for showcase
         const demoPrices: Record<string, number> = {
           'TOKEN0': 1.5,
           'TOKEN1': 2.3,
@@ -154,15 +148,11 @@ export default function ExchangePage() {
       const toAssetData = allAssets.find(c => c.symbol === toAsset);
 
       if (!fromAssetData || !toAssetData) {
-        toast.error('Asset not found! Please try again.');
-        return;
+        throw new Error('Asset not found! Please try again.');
       }
 
       if (fromAssetData.address === 'native' || toAssetData.address === 'native') {
-        toast.error('SEI money exchanges coming soon! ⭐');
-        setIsExchanging(false);
-        setExchangeStep('ready');
-        return;
+        throw new Error('SEI money exchanges coming soon! ⭐');
       }
 
       const amountInWei = parseUnits(amount, 18);
@@ -187,7 +177,7 @@ export default function ExchangePage() {
       // Success celebration
       setExchangeStep('success');
       setShowCelebration(true);
-      setTotalSavings(prev => prev + parseFloat(amount) * 0.003); // Mock savings from good rates
+      setTotalSavings(prev => prev + parseFloat(amount) * 0.003);
       
       toast.success('🎉 Exchange completed! You got an amazing rate!', { id: 'exchange' });
       
@@ -207,41 +197,35 @@ export default function ExchangePage() {
     }
   };
 
-  // Fetch user's assets when connected
-  useEffect(() => {
-    const getAssetBalances = async () => {
-      if (!address || !walletConnected) return;
+  const handleAssistantQuery = async () => {
+    if (!assistantQuery.trim()) return;
+    
+    try {
+      const response = await fetch('/api/baruk-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: assistantQuery,
+          userId: address,
+        }),
+      });
       
-      try {
-        console.log('Getting asset balances for:', address);
-      } catch (error) {
-        console.error('Error getting balances:', error);
-        setBalancesError('Failed to get your asset balances');
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Request failed');
       }
-    };
-
-    getAssetBalances();
-    const interval = setInterval(getAssetBalances, 10000);
-    return () => clearInterval(interval);
-  }, [address, walletConnected, setBalances, setBalancesError]);
-
-  // Listen for assistant events
-  useEffect(() => {
-    const handleAssistantEvent = (event: CustomEvent) => {
-      setAssistantQuery(event.detail.query);
-      setShowMagicAssistant(true);
-    };
-
-    window.addEventListener('openAI', handleAssistantEvent as EventListener);
-    return () => window.removeEventListener('openAI', handleAssistantEvent as EventListener);
-  }, []);
-
-  // Get user's available assets
-  const userAssets = balances.map(b => ({
-    ...b,
-    displayAmount: formatFromDecimals(b.amount, b.decimals),
-    dollarValue: getValueInDollars(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
-  })).filter(b => parseFloat(b.displayAmount) > 0);
+      
+      const data = await response.json();
+      console.log('Magic Assistant Response:', data);
+      toast.success('✨ Your magic assistant helped you!');
+      setAssistantQuery('');
+      setShowMagicAssistant(false);
+    } catch (error) {
+      console.error('Assistant error:', error);
+      toast.error(`Assistant error: ${(error as any).message || 'Your magic assistant is taking a break. Try again!'}`);
+    }
+  };
 
   // Get asset balances
   const fromAssetBalance = balances.find(b => {
@@ -267,36 +251,11 @@ export default function ExchangePage() {
   const priceFrom = fromAssetData ? tokenPrices[fromAssetData.address.toLowerCase()] || 0 : 0;
   const priceTo = toAssetData ? tokenPrices[toAssetData.address.toLowerCase()] || 0 : 0;
 
-  const handleAssistantQuery = async () => {
-    if (!assistantQuery.trim()) return;
-    
-    try {
-      const response = await fetch('/api/baruk-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: assistantQuery,
-          userId: address,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API Error:', errorData);
-        toast.error(`Assistant error: ${errorData.error || 'Request failed'}`);
-        return;
-      }
-      
-      const data = await response.json();
-      console.log('Magic Assistant Response:', data);
-      toast.success('✨ Your magic assistant helped you!');
-      setAssistantQuery('');
-      setShowMagicAssistant(false);
-    } catch (error) {
-      console.error('Assistant error:', error);
-      toast.error('Your magic assistant is taking a break. Try again!');
-    }
-  };
+  const userAssets = balances.map(b => ({
+    ...b,
+    displayAmount: formatFromDecimals(b.amount, b.decimals),
+    dollarValue: getValueInDollars(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
+  })).filter(b => parseFloat(b.displayAmount) > 0);
 
   const formatEarningsValue = (value: bigint | undefined) => {
     if (!value) return '0';
@@ -320,22 +279,7 @@ export default function ExchangePage() {
   };
 
   return (
-    <div className="min-h-screen max-w-7xl mx-auto px-3 sm:px-6 py-4">
-      {/* Welcome Section for New Users - Compact */}
-      {!address && (
-        <motion.div 
-          className="mb-6 p-4 rounded-xl bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-400/40 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="text-3xl mb-2">🪄</div>
-          <h1 className="text-xl font-bold text-white mb-2">Welcome to Magic Money Exchange!</h1>
-          <p className="text-sm text-gray-300">
-            Exchange any digital asset instantly, like magic! Connect your wallet to start ✨
-          </p>
-        </motion.div>
-      )}
-
+    <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-pink-900/20">
       {/* Celebration Animation */}
       <AnimatePresence>
         {showCelebration && (
@@ -359,314 +303,324 @@ export default function ExchangePage() {
         )}
       </AnimatePresence>
 
-      <div className="grid lg:grid-cols-[1fr,320px] gap-6">
-        {/* Main Exchange Interface - More Compact */}
-        <motion.div
-          className="relative p-6 rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm shadow-2xl"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          {/* Header - Smaller */}
-          <div className="mb-6 text-center">
-            <div className="text-2xl mb-2">💱</div>
-            <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Instant Money Exchange
-            </h2>
-            <p className="text-sm text-gray-300">Get the best rates automatically ✨</p>
-          </div>
+      <div className="max-w-6xl mx-auto p-4 lg:p-6">
+        {/* Welcome Section for New Users - Very Compact */}
+        {!address && (
+          <motion.div 
+            className="mb-4 p-3 rounded-xl bg-gradient-to-r from-purple-900/60 to-pink-900/60 border border-purple-400/40 text-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="text-2xl mb-1">🪄</div>
+            <h1 className="text-lg font-bold text-white mb-1">Welcome to Magic Money Exchange!</h1>
+            <p className="text-xs text-gray-300">
+              Exchange any digital asset instantly, like magic! Connect your wallet to start ✨
+            </p>
+          </motion.div>
+        )}
 
-          {/* Exchange Interface - Compact */}
-          <div className="space-y-4">
-            {/* From Asset - Reduced Padding */}
-            <motion.div 
-              className="p-4 rounded-xl bg-white/10 border border-purple-400/30 backdrop-blur-sm"
-              whileHover={{ scale: 1.01 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex justify-between mb-2 text-sm">
-                <span className="text-gray-300 font-medium">You Give</span>
-                <span className="text-gray-300">Available: {formattedFromBalance}</span>
-              </div>
-              <div className="flex gap-3 items-center">
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={e => setAmount(e.target.value)}
-                  placeholder="0.0"
-                  className="flex-1 bg-transparent text-2xl font-bold focus:outline-none text-white placeholder-gray-500"
-                />
-                <TokenSelector
-                  value={fromAsset}
-                  onChange={setFromAsset}
-                  tokens={allAssets}
-                  className="min-w-[120px] bg-purple-600/30 hover:bg-purple-600/50"
-                />
-              </div>
-              <div className="mt-2 text-sm text-purple-300">
-                ≈ ${getValueInDollars(amount, priceFrom)}
-              </div>
-            </motion.div>
-
-            {/* Swap Button - Smaller */}
-            <div className="flex justify-center">
-              <motion.button
-                onClick={() => {
-                  setFromAsset(toAsset);
-                  setToAsset(fromAsset);
-                }}
-                className="p-2 rounded-full bg-gradient-to-r from-purple-600/40 to-pink-600/40 hover:from-purple-500/50 hover:to-pink-500/50 transition-all border border-purple-400/30"
-                whileHover={{ scale: 1.1, rotate: 180 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <ArrowsRightLeftIcon className="h-5 w-5 text-purple-300" />
-              </motion.button>
+        <div className="grid lg:grid-cols-[2fr,1fr] gap-4 lg:gap-6">
+          {/* Main Exchange Interface - Ultra Compact */}
+          <motion.div
+            className="p-4 lg:p-6 rounded-2xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40 backdrop-blur-sm shadow-2xl"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            {/* Header - Very Small */}
+            <div className="mb-4 text-center">
+              <div className="text-xl mb-1">💱</div>
+              <h2 className="text-xl font-bold mb-1 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                Instant Money Exchange
+              </h2>
+              <p className="text-xs text-gray-300">Get the best rates automatically ✨</p>
             </div>
 
-            {/* To Asset - Reduced Padding */}
-            <motion.div 
-              className="p-4 rounded-xl bg-white/10 border border-green-400/30 backdrop-blur-sm"
-              whileHover={{ scale: 1.01 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="flex justify-between mb-2 text-sm">
-                <span className="text-gray-300 font-medium">You Get</span>
-                <span className="text-gray-300">Available: {formattedToBalance}</span>
-              </div>
-              <div className="flex gap-3 items-center">
-                <div className="flex-1 text-2xl font-bold text-green-400">
-                  {amount ? calculateExchangeAmount(amount, priceFrom, priceTo) : '0.0'}
+            {/* Exchange Interface - Super Compact */}
+            <div className="space-y-3">
+              {/* From Asset */}
+              <motion.div 
+                className="p-3 rounded-xl bg-white/10 border border-purple-400/30 backdrop-blur-sm"
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex justify-between mb-1 text-xs">
+                  <span className="text-gray-300 font-medium">You Give</span>
+                  <span className="text-gray-300">Available: {formattedFromBalance}</span>
                 </div>
-                <TokenSelector
-                  value={toAsset}
-                  onChange={setToAsset}
-                  tokens={allAssets}
-                  className="min-w-[120px] bg-green-600/30 hover:bg-green-600/50"
-                />
-              </div>
-              <div className="mt-2 text-sm text-green-300">
-                ≈ ${getValueInDollars(calculateExchangeAmount(amount, priceFrom, priceTo), priceTo)}
-              </div>
-            </motion.div>
-          </div>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    placeholder="0.0"
+                    className="flex-1 bg-transparent text-xl font-bold focus:outline-none text-white placeholder-gray-500"
+                  />
+                  <TokenSelector
+                    value={fromAsset}
+                    onChange={setFromAsset}
+                    tokens={allAssets}
+                    className="min-w-[100px] bg-purple-600/30 hover:bg-purple-600/50"
+                  />
+                </div>
+                <div className="mt-1 text-xs text-purple-300">
+                  ≈ ${getValueInDollars(amount, priceFrom)}
+                </div>
+              </motion.div>
 
-          {/* Exchange Stats - Compact */}
-          {amount && (
-            <motion.div 
-              className="mt-4 p-3 rounded-xl bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-400/20"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-            >
-              <div className="grid grid-cols-3 gap-4 text-center text-sm">
-                <div>
-                  <div className="text-green-400 font-bold">✨ Great Rate</div>
-                  <div className="text-xs text-gray-400">Best available</div>
-                </div>
-                <div>
-                  <div className="text-blue-400 font-bold">⚡ Instant</div>
-                  <div className="text-xs text-gray-400">&lt; 30 seconds</div>
-                </div>
-                <div>
-                  <div className="text-purple-400 font-bold">🔒 Safe</div>
-                  <div className="text-xs text-gray-400">100% secure</div>
-                </div>
+              {/* Swap Button */}
+              <div className="flex justify-center">
+                <motion.button
+                  onClick={() => {
+                    setFromAsset(toAsset);
+                    setToAsset(fromAsset);
+                  }}
+                  className="p-2 rounded-full bg-gradient-to-r from-purple-600/40 to-pink-600/40 hover:from-purple-500/50 hover:to-pink-500/50 transition-all border border-purple-400/30"
+                  whileHover={{ scale: 1.1, rotate: 180 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <ArrowsRightLeftIcon className="h-4 w-4 text-purple-300" />
+                </motion.button>
               </div>
-            </motion.div>
-          )}
 
-          {/* Main Action Button - Compact */}
-          <motion.button
-            onClick={handleExchange}
-            disabled={!walletConnected || !amount || isExchanging || exchangeStep === 'processing'}
-            className={`w-full mt-6 py-4 rounded-xl text-lg font-bold transition-all relative overflow-hidden
-              ${!walletConnected || !amount || isExchanging
-                ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl'
-              }`}
-            whileHover={!isExchanging ? { scale: 1.02 } : {}}
-            whileTap={!isExchanging ? { scale: 0.98 } : {}}
-          >
-            {!walletConnected
-              ? '🔗 Connect Your Wallet First'
-              : exchangeStep === 'processing'
-              ? '✨ Creating Magic...'
-              : exchangeStep === 'success'
-              ? '🎉 Exchange Successful!'
-              : isExchanging
-              ? '⚡ Exchanging...'
-              : '🪄 Make the Exchange!'}
-              
-            {exchangeStep === 'processing' && (
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                animate={{ x: ['-100%', '100%'] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
+              {/* To Asset */}
+              <motion.div 
+                className="p-3 rounded-xl bg-white/10 border border-green-400/30 backdrop-blur-sm"
+                whileHover={{ scale: 1.01 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex justify-between mb-1 text-xs">
+                  <span className="text-gray-300 font-medium">You Get</span>
+                  <span className="text-gray-300">Available: {formattedToBalance}</span>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 text-xl font-bold text-green-400">
+                    {amount ? calculateExchangeAmount(amount, priceFrom, priceTo) : '0.0'}
+                  </div>
+                  <TokenSelector
+                    value={toAsset}
+                    onChange={setToAsset}
+                    tokens={allAssets}
+                    className="min-w-[100px] bg-green-600/30 hover:bg-green-600/50"
+                  />
+                </div>
+                <div className="mt-1 text-xs text-green-300">
+                  ≈ ${getValueInDollars(calculateExchangeAmount(amount, priceFrom, priceTo), priceTo)}
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Exchange Stats - Very Compact */}
+            {amount && (
+              <motion.div 
+                className="mt-3 p-2 rounded-xl bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-400/20"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+              >
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div>
+                    <div className="text-green-400 font-bold">✨ Great Rate</div>
+                    <div className="text-xs text-gray-400">Best available</div>
+                  </div>
+                  <div>
+                    <div className="text-blue-400 font-bold">⚡ Instant</div>
+                    <div className="text-xs text-gray-400">&lt; 30 seconds</div>
+                  </div>
+                  <div>
+                    <div className="text-purple-400 font-bold">🔒 Safe</div>
+                    <div className="text-xs text-gray-400">100% secure</div>
+                  </div>
+                </div>
+              </motion.div>
             )}
-          </motion.button>
-        </motion.div>
 
-        {/* Sidebar - More Organized */}
-        <motion.div
-          className="space-y-4"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          {/* Your Earnings - Compact */}
-          {address && (
-            <div className="p-4 rounded-xl bg-gradient-to-b from-green-900/50 to-emerald-900/50 border border-green-400/40">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="text-2xl">💰</div>
-                <h3 className="text-lg font-bold text-green-400">Your Earnings</h3>
-              </div>
-              
-              {isUserDataLoading ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin h-6 w-6 border-2 border-green-400 border-t-transparent rounded-full mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-400">Loading...</p>
+            {/* Main Action Button - Compact */}
+            <motion.button
+              onClick={handleExchange}
+              disabled={!walletConnected || !amount || isExchanging || exchangeStep === 'processing'}
+              className={`w-full mt-4 py-3 rounded-xl text-base font-bold transition-all relative overflow-hidden
+                ${!walletConnected || !amount || isExchanging
+                  ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl'
+                }`}
+              whileHover={!isExchanging ? { scale: 1.02 } : {}}
+              whileTap={!isExchanging ? { scale: 0.98 } : {}}
+            >
+              {!walletConnected
+                ? '🔗 Connect Your Wallet First'
+                : exchangeStep === 'processing'
+                ? '✨ Creating Magic...'
+                : exchangeStep === 'success'
+                ? '🎉 Exchange Successful!'
+                : isExchanging
+                ? '⚡ Exchanging...'
+                : '🪄 Make the Exchange!'}
+                
+              {exchangeStep === 'processing' && (
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+              )}
+            </motion.button>
+          </motion.div>
+
+          {/* Sidebar - Optimized for Mobile */}
+          <motion.div
+            className="space-y-3"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {/* Your Earnings - Super Compact */}
+            {address && (
+              <div className="p-3 rounded-xl bg-gradient-to-b from-green-900/50 to-emerald-900/50 border border-green-400/40">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-lg">💰</div>
+                  <h3 className="text-sm font-bold text-green-400">Your Earnings</h3>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="p-3 rounded-lg bg-white/10 text-center">
-                    <div className="text-lg font-bold text-green-400">${totalSavings.toFixed(2)}</div>
+                
+                <div className="space-y-2">
+                  <div className="p-2 rounded-lg bg-white/10 text-center">
+                    <div className="text-sm font-bold text-green-400">${totalSavings.toFixed(2)}</div>
                     <p className="text-xs text-gray-400">Total Savings</p>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="p-2 rounded-lg bg-white/5 text-center">
-                      <div className="text-sm font-bold text-yellow-400">{formatEarningsValue(lpRewards)}</div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="p-1 rounded-lg bg-white/5 text-center">
+                      <div className="text-xs font-bold text-yellow-400">{formatEarningsValue(lpRewards)}</div>
                       <p className="text-xs text-gray-400">Rewards</p>
                     </div>
-                    <div className="p-2 rounded-lg bg-white/5 text-center">
-                      <div className="text-sm font-bold text-blue-400">{calculateMyShare()}%</div>
+                    <div className="p-1 rounded-lg bg-white/5 text-center">
+                      <div className="text-xs font-bold text-blue-400">{calculateMyShare()}%</div>
                       <p className="text-xs text-gray-400">Pool Share</p>
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Your Assets - Super Compact */}
+            <div className="p-3 rounded-xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40">
+              <div className="flex items-center gap-2 mb-2">
+                <CurrencyDollarIcon className="h-4 w-4 text-purple-400" />
+                <h3 className="text-sm font-bold">Your Money</h3>
+              </div>
+              
+              {userAssets.length > 0 ? (
+                <div className="space-y-1">
+                  {userAssets.slice(0, 3).map(asset => (
+                    <motion.div 
+                      key={asset.token} 
+                      className="flex items-center justify-between p-2 rounded-lg bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <div>
+                        <div className="font-bold text-white text-xs">{asset.symbol}</div>
+                        <div className="text-xs text-gray-400">{formatAssetBalance(asset.displayAmount)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-purple-400 font-semibold text-xs">${asset.dollarValue}</div>
+                        <button 
+                          onClick={() => setFromAsset(asset.symbol)}
+                          className="text-xs text-purple-300 hover:text-purple-200"
+                        >
+                          Use
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <div className="text-2xl mb-1">💰</div>
+                  <p className="text-xs text-gray-400">No money yet</p>
+                  <p className="text-xs text-gray-500">Connect wallet</p>
+                </div>
               )}
             </div>
-          )}
 
-          {/* Your Assets - Compact */}
-          <div className="p-4 rounded-xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40">
-            <div className="flex items-center gap-2 mb-3">
-              <CurrencyDollarIcon className="h-5 w-5 text-purple-400" />
-              <h3 className="text-lg font-bold">Your Money</h3>
-            </div>
-            
-            {userAssets.length > 0 ? (
+            {/* Magic Assistant - Ultra Compact */}
+            <div className="p-3 rounded-xl bg-gradient-to-b from-pink-900/50 to-purple-900/50 border border-pink-400/40">
+              <div className="flex items-center gap-2 mb-2">
+                <SparklesIcon className="h-4 w-4 text-pink-400" />
+                <h3 className="text-sm font-bold">Magic Assistant</h3>
+              </div>
+              
               <div className="space-y-2">
-                {userAssets.slice(0, 3).map(asset => (
+                <button 
+                  onClick={() => setShowMagicAssistant(!showMagicAssistant)}
+                  className="w-full p-2 rounded-lg bg-pink-600/30 hover:bg-pink-600/40 transition-all text-left"
+                >
+                  <div className="font-bold text-pink-300 text-xs">🤖 Ask for Help</div>
+                  <div className="text-xs text-gray-400">Get advice</div>
+                </button>
+                
+                {showMagicAssistant && (
                   <motion.div 
-                    key={asset.token} 
-                    className="flex items-center justify-between p-3 rounded-lg bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
-                    whileHover={{ scale: 1.02 }}
+                    className="space-y-2"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
                   >
-                    <div>
-                      <div className="font-bold text-white text-sm">{asset.symbol}</div>
-                      <div className="text-xs text-gray-400">{formatAssetBalance(asset.displayAmount)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-purple-400 font-semibold text-sm">${asset.dollarValue}</div>
-                      <button 
-                        onClick={() => setFromAsset(asset.symbol)}
-                        className="text-xs text-purple-300 hover:text-purple-200"
+                    <textarea
+                      value={assistantQuery}
+                      onChange={(e) => setAssistantQuery(e.target.value)}
+                      placeholder="What assets should I buy?"
+                      className="w-full p-2 rounded-lg bg-white/10 border border-pink-400/30 text-white placeholder-gray-500 resize-none text-xs"
+                      rows={2}
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        onClick={handleAssistantQuery}
+                        disabled={!assistantQuery.trim()}
+                        className="flex-1 py-1 px-2 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-all text-xs font-bold"
                       >
-                        Use This
+                        ✨ Get Advice
+                      </button>
+                      <button
+                        onClick={() => setShowMagicAssistant(false)}
+                        className="py-1 px-2 rounded-lg bg-gray-600/30 hover:bg-gray-600/40 transition-all text-xs"
+                      >
+                        Close
                       </button>
                     </div>
                   </motion.div>
-                ))}
+                )}
               </div>
-            ) : (
-              <div className="text-center py-4">
-                <div className="text-3xl mb-2">💰</div>
-                <p className="text-sm text-gray-400">No money yet</p>
-                <p className="text-xs text-gray-500">Connect wallet to see assets</p>
-              </div>
-            )}
-          </div>
-
-          {/* Magic Assistant - Compact */}
-          <div className="p-4 rounded-xl bg-gradient-to-b from-pink-900/50 to-purple-900/50 border border-pink-400/40">
-            <div className="flex items-center gap-2 mb-3">
-              <SparklesIcon className="h-5 w-5 text-pink-400" />
-              <h3 className="text-lg font-bold">Magic Assistant</h3>
             </div>
-            
-            <div className="space-y-2">
-              <button 
-                onClick={() => setShowMagicAssistant(!showMagicAssistant)}
-                className="w-full p-3 rounded-lg bg-pink-600/30 hover:bg-pink-600/40 transition-all text-left"
-              >
-                <div className="font-bold text-pink-300 text-sm">🤖 Ask for Help</div>
-                <div className="text-xs text-gray-400">Get personalized advice</div>
-              </button>
+
+            {/* Hot Assets - Compact */}
+            <div className="p-3 rounded-xl bg-gradient-to-b from-indigo-900/50 to-purple-900/50 border border-indigo-400/40">
+              <div className="flex items-center gap-2 mb-2">
+                <FireIcon className="h-4 w-4 text-indigo-400" />
+                <h3 className="text-sm font-bold">Hot Assets</h3>
+              </div>
               
-              {showMagicAssistant && (
-                <motion.div 
-                  className="space-y-2"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
+              <div className="space-y-1">
+                <TrendingTokens />
+                
+                <motion.button 
+                  onClick={() => window.location.href = '/liquidity'}
+                  className="w-full p-2 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 transition-all text-left"
+                  whileHover={{ scale: 1.02 }}
                 >
-                  <textarea
-                    value={assistantQuery}
-                    onChange={(e) => setAssistantQuery(e.target.value)}
-                    placeholder="What assets should I buy? Help me make money!"
-                    className="w-full p-2 rounded-lg bg-white/10 border border-pink-400/30 text-white placeholder-gray-500 resize-none text-sm"
-                    rows={2}
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleAssistantQuery}
-                      disabled={!assistantQuery.trim()}
-                      className="flex-1 py-2 px-3 rounded-lg bg-pink-600 hover:bg-pink-500 disabled:bg-pink-900/50 disabled:text-gray-400 transition-all text-xs font-bold"
-                    >
-                      ✨ Get Advice
-                    </button>
-                    <button
-                      onClick={() => setShowMagicAssistant(false)}
-                      className="py-2 px-3 rounded-lg bg-gray-600/30 hover:bg-gray-600/40 transition-all text-xs"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </motion.div>
-              )}
+                  <div className="font-bold text-indigo-300 text-xs">💧 Earn Money</div>
+                  <div className="text-xs text-gray-400">Put money to work</div>
+                </motion.button>
+                
+                <motion.button 
+                  onClick={() => setAssistantQuery('What are the best assets to buy right now?')}
+                  className="w-full p-2 rounded-lg bg-green-600/30 hover:bg-green-600/40 transition-all text-left"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="font-bold text-green-300 text-xs">🔥 Hot Tips</div>
+                  <div className="text-xs text-gray-400">Get AI advice</div>
+                </motion.button>
+              </div>
             </div>
-          </div>
-
-          {/* Hot Assets & Quick Actions - Combined */}
-          <div className="p-4 rounded-xl bg-gradient-to-b from-indigo-900/50 to-purple-900/50 border border-indigo-400/40">
-            <div className="flex items-center gap-2 mb-3">
-              <FireIcon className="h-5 w-5 text-indigo-400" />
-              <h3 className="text-lg font-bold">Hot Assets & Actions</h3>
-            </div>
-            
-            <div className="space-y-2">
-              <TrendingTokens />
-              
-              <motion.button 
-                onClick={() => window.location.href = '/liquidity'}
-                className="w-full p-3 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/40 transition-all text-left"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="font-bold text-indigo-300 text-sm">💧 Earn Money</div>
-                <div className="text-xs text-gray-400">Put your money to work daily</div>
-              </motion.button>
-              
-              <motion.button 
-                onClick={() => setAssistantQuery('What are the best assets to buy right now?')}
-                className="w-full p-3 rounded-lg bg-green-600/30 hover:bg-green-600/40 transition-all text-left"
-                whileHover={{ scale: 1.02 }}
-              >
-                <div className="font-bold text-green-300 text-sm">🔥 Hot Tips</div>
-                <div className="text-xs text-gray-400">Get AI-powered investment advice</div>
-              </motion.button>
-            </div>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </div>
     </div>
   );
