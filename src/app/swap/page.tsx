@@ -33,8 +33,8 @@ export default function ExchangePage() {
   const { reserves, totalLiquidity, lpFeeBps, isReservesLoading } = useBarukAMM();
   const { liquidityBalance, lpRewards, balanceOf, isLoading: isUserDataLoading } = useUserAMMData(address);
 
-  const [fromCoin, setFromCoin] = useState('TOKEN0');
-  const [toCoin, setToCoin] = useState('TOKEN1');
+  const [fromAsset, setFromAsset] = useState('TOKEN0');
+  const [toAsset, setToAsset] = useState('TOKEN1');
   const [amount, setAmount] = useState('');
   const [isExchanging, setIsExchanging] = useState(false);
   const [showMagicAssistant, setShowMagicAssistant] = useState(false);
@@ -43,13 +43,13 @@ export default function ExchangePage() {
   const [exchangeStep, setExchangeStep] = useState('ready'); // ready, processing, success
   const [totalSavings, setTotalSavings] = useState(0);
 
-  // Get available coins
+  // Get available assets
   const protocol = getSeiProtocolById(DEFAULT_PROTOCOL_ID) as SeiProtocol;
-  const protocolCoins = getProtocolTokens(DEFAULT_PROTOCOL_ID);
+  const protocolAssets = getProtocolTokens(DEFAULT_PROTOCOL_ID);
   
-  const allCoins = [
-    { symbol: 'SEI', address: 'native', name: 'Sei Coin' },
-    ...protocolCoins.map(coin => ({ ...coin, name: coin.symbol }))
+  const allAssets = [
+    { symbol: 'SEI', address: 'native', name: 'Sei Money' },
+    ...protocolAssets.map(asset => ({ ...asset, name: asset.symbol }))
   ];
 
   // Helper to format large numbers nicely
@@ -88,7 +88,7 @@ export default function ExchangePage() {
     if (isNaN(amountNum) || amountNum <= 0) return '0.0';
     
     if (priceFrom === 0 && priceTo === 0) {
-      if (fromCoin === toCoin) {
+      if (fromAsset === toAsset) {
         return amountNum.toFixed(6);
       } else {
         // Use demo prices for showcase
@@ -98,8 +98,8 @@ export default function ExchangePage() {
           'TOKEN2': 0.8,
           'SEI': 0.45
         };
-        const demoFromPrice = demoPrices[fromCoin] || 1;
-        const demoToPrice = demoPrices[toCoin] || 1;
+        const demoFromPrice = demoPrices[fromAsset] || 1;
+        const demoToPrice = demoPrices[toAsset] || 1;
         
         const receiveAmount = amountNum * (demoFromPrice / demoToPrice);
         return receiveAmount.toFixed(6);
@@ -112,7 +112,7 @@ export default function ExchangePage() {
     return receiveAmount.toFixed(6);
   };
 
-  const formatCoinBalance = (amount: string) => {
+  const formatAssetBalance = (amount: string) => {
     try {
       const num = parseFloat(amount);
       if (num === 0) return '0';
@@ -141,8 +141,8 @@ export default function ExchangePage() {
       return;
     }
 
-    if (fromCoin === toCoin) {
-      toast.error('Pick different coins to exchange! 🔄');
+    if (fromAsset === toAsset) {
+      toast.error('Pick different assets to exchange! 🔄');
       return;
     }
 
@@ -150,16 +150,16 @@ export default function ExchangePage() {
     setExchangeStep('processing');
     
     try {
-      const fromCoinData = allCoins.find(c => c.symbol === fromCoin);
-      const toCoinData = allCoins.find(c => c.symbol === toCoin);
+      const fromAssetData = allAssets.find(c => c.symbol === fromAsset);
+      const toAssetData = allAssets.find(c => c.symbol === toAsset);
 
-      if (!fromCoinData || !toCoinData) {
-        toast.error('Coin not found! Please try again.');
+      if (!fromAssetData || !toAssetData) {
+        toast.error('Asset not found! Please try again.');
         return;
       }
 
-      if (fromCoinData.address === 'native' || toCoinData.address === 'native') {
-        toast.error('SEI coin exchanges coming soon! ⭐');
+      if (fromAssetData.address === 'native' || toAssetData.address === 'native') {
+        toast.error('SEI money exchanges coming soon! ⭐');
         setIsExchanging(false);
         setExchangeStep('ready');
         return;
@@ -170,7 +170,7 @@ export default function ExchangePage() {
       // Step 1: Allow the exchange to happen
       toast.loading('Setting up your exchange... ⚡', { id: 'exchange' });
       const approvalTx = await wagmiCallTokenContract(
-        fromCoinData.address,
+        fromAssetData.address,
         'approve',
         [contractAddresses.router, amountInWei]
       );
@@ -180,7 +180,7 @@ export default function ExchangePage() {
       toast.loading('Making the magic happen... ✨', { id: 'exchange' });
       const swapTx = await wagmiCallContract(
         'swap',
-        [fromCoinData.address, toCoinData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
+        [fromAssetData.address, toAssetData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
       await waitForTransactionReceipt(config, { hash: swapTx.hash });
 
@@ -207,21 +207,21 @@ export default function ExchangePage() {
     }
   };
 
-  // Fetch user's coins when connected
+  // Fetch user's assets when connected
   useEffect(() => {
-    const getCoinBalances = async () => {
+    const getAssetBalances = async () => {
       if (!address || !walletConnected) return;
       
       try {
-        console.log('Getting coin balances for:', address);
+        console.log('Getting asset balances for:', address);
       } catch (error) {
         console.error('Error getting balances:', error);
-        setBalancesError('Failed to get your coin balances');
+        setBalancesError('Failed to get your asset balances');
       }
     };
 
-    getCoinBalances();
-    const interval = setInterval(getCoinBalances, 10000);
+    getAssetBalances();
+    const interval = setInterval(getAssetBalances, 10000);
     return () => clearInterval(interval);
   }, [address, walletConnected, setBalances, setBalancesError]);
 
@@ -236,36 +236,36 @@ export default function ExchangePage() {
     return () => window.removeEventListener('openAI', handleAssistantEvent as EventListener);
   }, []);
 
-  // Get user's available coins
-  const userCoins = balances.map(b => ({
+  // Get user's available assets
+  const userAssets = balances.map(b => ({
     ...b,
     displayAmount: formatFromDecimals(b.amount, b.decimals),
     dollarValue: getValueInDollars(formatFromDecimals(b.amount, b.decimals), tokenPrices[b.token?.toLowerCase()])
   })).filter(b => parseFloat(b.displayAmount) > 0);
 
-  // Get coin balances
-  const fromCoinBalance = balances.find(b => {
-    if (fromCoin === 'SEI' && b.token === 'native') return true;
-    const coinData = allCoins.find(c => c.symbol === fromCoin);
-    return coinData && b.token === coinData.address;
+  // Get asset balances
+  const fromAssetBalance = balances.find(b => {
+    if (fromAsset === 'SEI' && b.token === 'native') return true;
+    const assetData = allAssets.find(c => c.symbol === fromAsset);
+    return assetData && b.token === assetData.address;
   })?.amount || '0';
   
-  const toCoinBalance = balances.find(b => {
-    if (toCoin === 'SEI' && b.token === 'native') return true;
-    const coinData = allCoins.find(c => c.symbol === toCoin);
-    return coinData && b.token === coinData.address;
+  const toAssetBalance = balances.find(b => {
+    if (toAsset === 'SEI' && b.token === 'native') return true;
+    const assetData = allAssets.find(c => c.symbol === toAsset);
+    return assetData && b.token === assetData.address;
   })?.amount || '0';
   
-  const fromCoinData = allCoins.find(c => c.symbol === fromCoin);
-  const toCoinData = allCoins.find(c => c.symbol === toCoin);
-  const fromDecimals = fromCoinData?.address === 'native' ? 18 : 18;
-  const toDecimals = toCoinData?.address === 'native' ? 18 : 18;
+  const fromAssetData = allAssets.find(c => c.symbol === fromAsset);
+  const toAssetData = allAssets.find(c => c.symbol === toAsset);
+  const fromDecimals = fromAssetData?.address === 'native' ? 18 : 18;
+  const toDecimals = toAssetData?.address === 'native' ? 18 : 18;
   
-  const formattedFromBalance = formatFromDecimals(fromCoinBalance, fromDecimals);
-  const formattedToBalance = formatFromDecimals(toCoinBalance, toDecimals);
+  const formattedFromBalance = formatFromDecimals(fromAssetBalance, fromDecimals);
+  const formattedToBalance = formatFromDecimals(toAssetBalance, toDecimals);
   
-  const priceFrom = fromCoinData ? tokenPrices[fromCoinData.address.toLowerCase()] || 0 : 0;
-  const priceTo = toCoinData ? tokenPrices[toCoinData.address.toLowerCase()] || 0 : 0;
+  const priceFrom = fromAssetData ? tokenPrices[fromAssetData.address.toLowerCase()] || 0 : 0;
+  const priceTo = toAssetData ? tokenPrices[toAssetData.address.toLowerCase()] || 0 : 0;
 
   const handleAssistantQuery = async () => {
     if (!assistantQuery.trim()) return;
@@ -322,12 +322,12 @@ export default function ExchangePage() {
           animate={{ opacity: 1, y: 0 }}
         >
           <div className="text-6xl mb-4">🪄</div>
-          <h1 className="text-3xl font-bold text-white mb-4">Welcome to Magic Coin Exchange!</h1>
+          <h1 className="text-3xl font-bold text-white mb-4">Welcome to Magic Money Exchange!</h1>
           <p className="text-lg text-gray-300 mb-6">
-            Exchange any coin for any other coin instantly, like magic! ✨
+            Exchange any digital asset for any other asset instantly, like magic! ✨
           </p>
           <p className="text-gray-400">
-            Connect your digital wallet to start exchanging coins and earning rewards!
+            Connect your digital wallet to start exchanging assets and earning rewards!
           </p>
         </motion.div>
       )}
@@ -366,7 +366,7 @@ export default function ExchangePage() {
           <div className="mb-8 text-center">
             <div className="text-4xl mb-3">💱</div>
             <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              Instant Coin Exchange
+              Instant Money Exchange
             </h2>
             <p className="text-gray-300">
               Get the best rates automatically. No hidden fees, just magic! ✨
@@ -396,9 +396,9 @@ export default function ExchangePage() {
                   className="flex-1 bg-transparent text-3xl font-bold focus:outline-none text-white placeholder-gray-500"
                 />
                 <TokenSelector
-                  value={fromCoin}
-                  onChange={setFromCoin}
-                  tokens={allCoins}
+                  value={fromAsset}
+                  onChange={setFromAsset}
+                  tokens={allAssets}
                   className="min-w-[140px] bg-purple-600/30 hover:bg-purple-600/50"
                 />
               </div>
@@ -411,8 +411,8 @@ export default function ExchangePage() {
             <div className="flex justify-center">
               <motion.button
                 onClick={() => {
-                  setFromCoin(toCoin);
-                  setToCoin(fromCoin);
+                  setFromAsset(toAsset);
+                  setToAsset(fromAsset);
                 }}
                 className="p-3 rounded-full bg-gradient-to-r from-purple-600/40 to-pink-600/40 hover:from-purple-500/50 hover:to-pink-500/50 transition-all border border-purple-400/30"
                 whileHover={{ scale: 1.1, rotate: 180 }}
@@ -439,9 +439,9 @@ export default function ExchangePage() {
                   {amount ? calculateExchangeAmount(amount, priceFrom, priceTo) : '0.0'}
                 </div>
                 <TokenSelector
-                  value={toCoin}
-                  onChange={setToCoin}
-                  tokens={allCoins}
+                  value={toAsset}
+                  onChange={setToAsset}
+                  tokens={allAssets}
                   className="min-w-[140px] bg-green-600/30 hover:bg-green-600/50"
                 />
               </div>
@@ -549,29 +549,29 @@ export default function ExchangePage() {
             </div>
           )}
 
-          {/* Your Coins */}
+          {/* Your Assets */}
           <div className="p-6 rounded-xl bg-gradient-to-b from-purple-900/50 to-blue-900/50 border border-purple-400/40">
             <div className="flex items-center gap-2 mb-4">
               <CurrencyDollarIcon className="h-6 w-6 text-purple-400" />
-              <h3 className="text-xl font-bold">Your Coins</h3>
+              <h3 className="text-xl font-bold">Your Money</h3>
             </div>
             
-            {userCoins.length > 0 ? (
+            {userAssets.length > 0 ? (
               <div className="space-y-3">
-                {userCoins.slice(0, 4).map(coin => (
+                {userAssets.slice(0, 4).map(asset => (
                   <motion.div 
-                    key={coin.token} 
+                    key={asset.token} 
                     className="flex items-center justify-between p-4 rounded-lg bg-white/10 hover:bg-white/15 transition-all cursor-pointer"
                     whileHover={{ scale: 1.02 }}
                   >
                     <div>
-                      <div className="font-bold text-white">{coin.symbol}</div>
-                      <div className="text-sm text-gray-400">{formatCoinBalance(coin.displayAmount)}</div>
+                      <div className="font-bold text-white">{asset.symbol}</div>
+                      <div className="text-sm text-gray-400">{formatAssetBalance(asset.displayAmount)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-purple-400 font-semibold">${coin.dollarValue}</div>
+                      <div className="text-purple-400 font-semibold">${asset.dollarValue}</div>
                       <button 
-                        onClick={() => setFromCoin(coin.symbol)}
+                        onClick={() => setFromAsset(asset.symbol)}
                         className="text-xs text-purple-300 hover:text-purple-200"
                       >
                         Use This
@@ -582,9 +582,9 @@ export default function ExchangePage() {
               </div>
             ) : (
               <div className="text-center py-6">
-                <div className="text-4xl mb-3">🪙</div>
-                <p className="text-gray-400">No coins yet</p>
-                <p className="text-sm text-gray-500">Connect wallet to see your coins</p>
+                <div className="text-4xl mb-3">💰</div>
+                <p className="text-gray-400">No money yet</p>
+                <p className="text-sm text-gray-500">Connect wallet to see your assets</p>
               </div>
             )}
           </div>
@@ -614,7 +614,7 @@ export default function ExchangePage() {
                   <textarea
                     value={assistantQuery}
                     onChange={(e) => setAssistantQuery(e.target.value)}
-                    placeholder="What coins should I buy? Which ones are trending? Help me make money!"
+                    placeholder="What assets should I buy? Which ones are trending? Help me make money!"
                     className="w-full p-3 rounded-lg bg-white/10 border border-pink-400/30 text-white placeholder-gray-500 resize-none"
                     rows={3}
                   />
@@ -655,11 +655,11 @@ export default function ExchangePage() {
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="font-bold text-indigo-300">💧 Earn Money</div>
-                <div className="text-sm text-gray-400">Put your coins to work and earn daily</div>
+                <div className="text-sm text-gray-400">Put your money to work and earn daily</div>
               </motion.button>
               
               <motion.button 
-                onClick={() => setAssistantQuery('What are the best coins to buy right now?')}
+                onClick={() => setAssistantQuery('What are the best assets to buy right now?')}
                 className="w-full p-4 rounded-lg bg-green-600/30 hover:bg-green-600/40 transition-all text-left"
                 whileHover={{ scale: 1.02 }}
               >
@@ -669,16 +669,16 @@ export default function ExchangePage() {
               
               <motion.button 
                 onClick={() => {
-                  const coins = ['TOKEN0', 'TOKEN1', 'TOKEN2'];
-                  const randomCoin = coins[Math.floor(Math.random() * coins.length)];
-                  setToCoin(randomCoin);
-                  toast.success(`✨ How about trying ${randomCoin}? It's looking good!`);
+                  const assets = ['TOKEN0', 'TOKEN1', 'TOKEN2'];
+                  const randomAsset = assets[Math.floor(Math.random() * assets.length)];
+                  setToAsset(randomAsset);
+                  toast.success(`✨ How about trying ${randomAsset}? It's looking good!`);
                 }}
                 className="w-full p-4 rounded-lg bg-purple-600/30 hover:bg-purple-600/40 transition-all text-left"
                 whileHover={{ scale: 1.02 }}
               >
                 <div className="font-bold text-purple-300">🎲 Surprise Me</div>
-                <div className="text-sm text-gray-400">Pick a random coin for me</div>
+                <div className="text-sm text-gray-400">Pick a random asset for me</div>
               </motion.button>
             </div>
           </div>
