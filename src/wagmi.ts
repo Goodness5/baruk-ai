@@ -1,28 +1,42 @@
 import { http, createConfig } from 'wagmi';
-import { mainnet, polygon, arbitrum, optimism } from 'wagmi/chains';
-import { seiTestnet } from './chains/seiTestnet';
-import { injected } from 'wagmi/connectors';
-import { metaMask } from '@wagmi/connectors'
+import { mainnet } from 'wagmi/chains';
+import { injected } from '@wagmi/connectors';
+
+// Define Sei Network testnet
+const seiTestnet = {
+  id: 713715,
+  name: 'Sei Network Testnet',
+  network: 'sei-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'SEI',
+    symbol: 'SEI'
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://evm-rpc-testnet.sei-apis.com']
+    },
+    public: {
+      http: ['https://evm-rpc-testnet.sei-apis.com']
+    }
+  },
+  blockExplorers: {
+    default: {
+      name: 'Sei Testnet Explorer',
+      url: 'https://testnet.sei.io/explorer'
+    }
+  }
+} as const;
 
 export const config = createConfig({
-  chains: [seiTestnet, mainnet, polygon, arbitrum, optimism],
+  chains: [seiTestnet, mainnet],
   connectors: [
-    injected(),
-    
-    metaMask({
-      dappMetadata: {
-        name: 'Baruk AI',
-        url: 'https://baruk.ai',
-        iconUrl: 'https://baruk.ai/favicon.ico',
-      },
-    }),
+    // Only keep injected for Privy compatibility
+    injected()
   ],
   transports: {
     [seiTestnet.id]: http('https://evm-rpc-testnet.sei-apis.com'),
-    [mainnet.id]: http(),
-    [polygon.id]: http(),
-    [arbitrum.id]: http(),
-    [optimism.id]: http(),
+    [mainnet.id]: http()
   },
   ssr: true,
 });

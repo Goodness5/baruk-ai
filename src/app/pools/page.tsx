@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { SparklesIcon } from '@heroicons/react/24/outline';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol } from '../lib/seiProtocols';
 import { useBarukYieldFarm } from '../lib/hooks';
-import { useAccount } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { formatUnits } from 'viem';
 
 // Pool configuration - in real app this would come from API/config
@@ -234,9 +234,22 @@ function PoolCard({ poolConfig, userAddress }: {
 }
 
 export default function PoolsPage() {
-  const { address } = useAccount();
+  const { authenticated, user } = usePrivy();
   const [protocolId, setProtocolId] = useState<string>(DEFAULT_PROTOCOL_ID);
   const protocol = getSeiProtocolById(protocolId) as SeiProtocol;
+  
+  // Get user's wallet address from Privy
+  let address: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      address = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      address = (user.wallet.address as any).address || null;
+    }
+  }
 
   return (
     <motion.div
@@ -273,9 +286,9 @@ export default function PoolsPage() {
         Selected Magic Engine: <span className="font-bold">{protocol?.name}</span>
       </div>
 
-      {!address && (
+      {!authenticated && (
         <div className="text-center py-8 text-white/60">
-          Please connect your wallet to view and interact with pools.
+          Please sign in with Privy to view and interact with pools.
         </div>
       )}
       

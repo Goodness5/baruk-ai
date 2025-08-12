@@ -10,7 +10,7 @@ import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } fro
 import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
-import { useAccount } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { waitForTransactionReceipt } from '@wagmi/core'
 import { config } from '@/wagmi';
 import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
@@ -20,14 +20,31 @@ import TrendingTokens from '../components/TrendingTokens';
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function ExchangePage() {
-  const { address, isConnected: walletConnected } = useAccount();
+  const { authenticated, user } = usePrivy();
   const balances = useAppStore(s => s.balances);
   const tokenPrices = useAppStore(s => s.tokenPrices);
   const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
   
+  // Get user's wallet address from Privy - handle both string and object cases
+  let address: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      address = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      address = (user.wallet.address as any).address || null;
+    }
+  }
+  
+  // Debug: Log user object to see structure
+  console.log('Privy user object:', user);
+  console.log('Wallet address:', address);
+  
   // Pool and earning data
   const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
-  const { liquidityBalance, lpRewards } = useUserAMMData(address);
+  const { liquidityBalance, lpRewards } = useUserAMMData(address || undefined);
 
   const [fromAsset, setFromAsset] = useState('TOKEN0');
   const [toAsset, setToAsset] = useState('TOKEN1');
@@ -125,8 +142,8 @@ export default function ExchangePage() {
   };
 
   const handleExchange = async () => {
-    if (!address || !walletConnected) {
-      toast.error('Please connect your digital wallet first! 🔗');
+    if (!address || !authenticated) {
+      toast.error('Please sign in with Privy first! 🔗');
       return;
     }
 
@@ -168,6 +185,21 @@ export default function ExchangePage() {
 
       // Step 2: Do the actual exchange
       toast.loading('Making the magic happen... ✨', { id: 'exchange' });
+      
+      // Check if pool exists before attempting swap
+      try {
+        const poolAddress = await wagmiCallContract('getPair', [fromAssetData.address, toAssetData.address]);
+        console.log('Pool address:', poolAddress);
+        
+        if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
+          throw new Error('No liquidity pool exists for this token pair. You need to add liquidity first.');
+        }
+      } catch (error) {
+        console.error('Pool check failed:', error);
+        throw new Error('No liquidity pool exists for this token pair. You need to add liquidity first.');
+      }
+      
+      // Attempt the swap
       const swapTx = await wagmiCallContract(
         'swap',
         [fromAssetData.address, toAssetData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
@@ -190,7 +222,18 @@ export default function ExchangePage() {
     } catch (error) {
       console.error('Exchange error:', error);
       const errorMessage = (error as any)?.message || 'Something went wrong';
-      toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+      
+      // Check if it's a pool-related error
+      if (errorMessage.includes('No liquidity pool exists')) {
+        toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+        toast.error('💡 Tip: You need to add liquidity to this token pair first. Go to the Liquidity page to create a pool.', { 
+          id: 'liquidity-tip',
+          duration: 8000 
+        });
+      } else {
+        toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+      }
+      
       setExchangeStep('ready');
     } finally {
       setIsExchanging(false);
@@ -302,6 +345,8 @@ export default function ExchangePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       <div className="max-w-6xl mx-auto p-4 lg:p-6">
         {/* Welcome Section for New Users - Very Compact */}
@@ -437,17 +482,17 @@ export default function ExchangePage() {
             {/* Main Action Button - Compact */}
             <motion.button
               onClick={handleExchange}
-              disabled={!walletConnected || !amount || isExchanging || exchangeStep === 'processing'}
+              disabled={!authenticated || !amount || isExchanging || exchangeStep === 'processing'}
               className={`w-full mt-4 py-3 rounded-xl text-base font-bold transition-all relative overflow-hidden
-                ${!walletConnected || !amount || isExchanging
+                ${!authenticated || !amount || isExchanging
                   ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl'
                 }`}
               whileHover={!isExchanging ? { scale: 1.02 } : {}}
               whileTap={!isExchanging ? { scale: 0.98 } : {}}
             >
-              {!walletConnected
-                ? '🔗 Connect Your Wallet First'
+              {!authenticated
+                ? '🔗 Sign In with Privy First'
                 : exchangeStep === 'processing'
                 ? '✨ Creating Magic...'
                 : exchangeStep === 'success'

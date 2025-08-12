@@ -6,12 +6,13 @@ import { config } from '../../wagmi';
 
 export default function ConnectWallet() {
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, isLoading, pendingConnector, error } = useConnect();
+  const { connect, connectors, pendingConnector, error } = useConnect();
   const { disconnect } = useDisconnect();
   const [isOpen, setIsOpen] = useState(false);
   const [availableConnectors, setAvailableConnectors] = useState<typeof connectors>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const isOnSeiTestnet = chainId === seiTestnet.id;
 
@@ -74,10 +75,13 @@ export default function ConnectWallet() {
 
   const handleConnect = async (connector: typeof connectors[number]) => {
     try {
+      setIsLoading(true);
       await connect({ connector });
       setIsOpen(false);
     } catch (err) {
       console.error('Connection failed:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -152,7 +156,7 @@ export default function ConnectWallet() {
                   <span className="text-sm">
                     {connector.id === 'metaMask' ? 'MetaMask' : connector.name}
                   </span>
-                  {isLoading && connector.id === pendingConnector?.id && (
+                  {isLoading && (
                     <span className="text-xs text-blue-400">Connecting...</span>
                   )}
                 </div>

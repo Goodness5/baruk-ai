@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { getWalletTokenHoldings } from '../lib/barukTools';
-import { useAccount } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { TokenHolding, TokenError } from '../lib/types';
 
 export default function BalanceWatcher() {
@@ -15,15 +15,28 @@ export default function BalanceWatcher() {
   const setBalancesError = useAppStore(s => s.setBalancesError);
   const setAddress = useAppStore(s => s.setAddress);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const { isConnected, address: wagmiAddress } = useAccount();
+  const { authenticated, user } = usePrivy();
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   
-  // Use the wagmi address if available, otherwise fall back to store address
-  const currentAddress = wagmiAddress || address;
+  // Get user's wallet address from Privy
+  let currentAddress: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      currentAddress = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      currentAddress = (user.wallet.address as { address?: string }).address || null;
+    }
+  }
+  
+  // Use the Privy address if available, otherwise fall back to store address
+  currentAddress = currentAddress || address;
   
   console.log('BalanceWatcher Debug:', {
-    isConnected,
-    wagmiAddress,
+    authenticated,
+    privyAddress: currentAddress,
     storeAddress: address,
     currentAddress,
     balancesLength: balances.length
@@ -40,10 +53,10 @@ export default function BalanceWatcher() {
   ], []);
 
   const fetchAndUpdateBalances = useCallback(async () => {
-    console.log('fetchAndUpdateBalances called:', { currentAddress, isConnected });
+    console.log('fetchAndUpdateBalances called:', { currentAddress, authenticated });
     
-    if (!currentAddress || !isConnected) {
-      console.log('Not fetching balances - not connected or no address');
+    if (!currentAddress || !authenticated) {
+      console.log('Not fetching balances - not authenticated or no address');
       setBalances([]);
       setBalancesLoading(false);
       setBalancesError(null);
@@ -85,14 +98,14 @@ export default function BalanceWatcher() {
       }
       setBalancesLoading(false);
     }
-  }, [currentAddress, isConnected, setBalances, setBalancesLoading, setBalancesError]);
+  }, [currentAddress, authenticated, setBalances, setBalancesLoading, setBalancesError]);
 
-  // Synchronize wagmi address with app store and backend
+  // Synchronize Privy address with app store and backend
   useEffect(() => {
     const syncWalletState = async () => {
-      if (wagmiAddress && wagmiAddress !== address) {
-        console.log('Syncing wagmi address to app store:', wagmiAddress);
-        setAddress(wagmiAddress);
+      if (currentAddress && currentAddress !== address) {
+        console.log('Syncing Privy address to app store:', currentAddress);
+        setAddress(currentAddress);
         
         // Also sync with backend
         try {
@@ -103,9 +116,9 @@ export default function BalanceWatcher() {
             },
             body: JSON.stringify({
               action: 'connect',
-              userId: wagmiAddress,
-              address: wagmiAddress,
-              type: 'external'
+              userId: currentAddress,
+              address: currentAddress,
+              type: 'embedded'
             }),
           });
           
@@ -117,7 +130,7 @@ export default function BalanceWatcher() {
         } catch (error) {
           console.error('Error syncing wallet with backend:', error);
         }
-      } else if (!wagmiAddress && address) {
+      } else if (!currentAddress && address) {
         console.log('Clearing app store address - wallet disconnected');
         setAddress(null);
         
@@ -134,28 +147,28 @@ export default function BalanceWatcher() {
             }),
           });
         } catch (error) {
-          console.error('Error disconnecting wallet from backend:', error);
+          console.error('Error disconnecting wallet from backend', error);
         }
       }
     };
 
     syncWalletState();
-  }, [wagmiAddress, address, setAddress]);
+  }, [currentAddress, address, setAddress]);
 
   // Initial fetch
   useEffect(() => {
     fetchAndUpdateBalances();
-  }, [currentAddress, tokens, isConnected, fetchAndUpdateBalances]);
+  }, [currentAddress, tokens, authenticated, fetchAndUpdateBalances]);
 
   // Real-time updates every 10 seconds
   useEffect(() => {
-    if (!currentAddress || !isConnected) return;
+    if (!currentAddress || !authenticated) return;
     const interval = setInterval(fetchAndUpdateBalances, 10000); // 10 seconds
     return () => clearInterval(interval);
-  }, [currentAddress, tokens, isConnected, fetchAndUpdateBalances]);
+  }, [currentAddress, tokens, authenticated, fetchAndUpdateBalances]);
 
-  // Don't render anything if not connected
-  if (!isConnected || !currentAddress) return null;
+  // Don't render anything if not authenticated
+  if (!authenticated || !currentAddress) return null;
 
   const getTokenSymbol = (tokenAddress: string) => {
     return tokens.find(t => t.address.toLowerCase() === tokenAddress.toLowerCase())?.symbol || 'Unknown';
