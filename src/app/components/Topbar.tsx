@@ -28,15 +28,19 @@ export default function Topbar() {
   console.log('Topbar - User keys:', user ? Object.keys(user) : 'No user');
   console.log('Topbar - Wallet address:', walletAddress);
 
-  // Redirect to dashboard after successful authentication
+  // Redirect to dashboard only once after initial authentication
   useEffect(() => {
     if (authenticated && ready) {
-      // Small delay to ensure wallet is ready
-      const timer = setTimeout(() => {
-        router.push('/dashboard');
-      }, 2000);
-      
-      return () => clearTimeout(timer);
+      // Check if we're already on the dashboard or if this is initial login
+      const currentPath = window.location.pathname;
+      if (currentPath === '/') {
+        // Only redirect from home page, not from other pages
+        const timer = setTimeout(() => {
+          router.push('/dashboard');
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
     }
   }, [authenticated, ready, router]);
 

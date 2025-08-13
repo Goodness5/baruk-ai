@@ -10,7 +10,7 @@ interface PrivyProviderProps {
 
 // Define Sei Network testnet chain configuration
 const seiTestnet = defineChain({
-  id: 713715,
+  id: 1328, // Correct Sei testnet EVM chain ID
   name: 'Sei Network Testnet',
   network: 'sei-testnet',
   nativeCurrency: {

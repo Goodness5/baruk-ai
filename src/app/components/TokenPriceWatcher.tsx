@@ -15,7 +15,8 @@ export default function TokenPriceWatcher() {
       setTokenPricesLoading(true);
       setTokenPricesError(null);
       try {
-        const prices = await fetchTokenPrices(tokens.map(t => t.address));
+        // Pass Sei Network testnet chain ID (1328) to avoid API errors
+        const prices = await fetchTokenPrices(tokens.map(t => t.address), 1328);
         if (active) setTokenPrices(prices);
       } catch (err: unknown) {
         if (active) {

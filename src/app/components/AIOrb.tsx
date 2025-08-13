@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { SparklesIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { useAI } from "./AIContext";
-import { useAccount } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 // Utility to strip inline styles from agent HTML
 function stripAgentStyles(html: string) {
   // Remove all style="..." attributes
@@ -25,7 +25,20 @@ export default function AIOrb() {
   const { state, dispatch } = useAI();
   const inputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const { address, isConnected } = useAccount();
+  const { user, authenticated } = usePrivy();
+  
+  // Get user's wallet address from Privy
+  let address: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      address = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      address = (user.wallet.address as { address?: string }).address || null;
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -47,7 +60,7 @@ export default function AIOrb() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: state.input, 
-          userId: address || 'anonymous',
+          userId: address || (authenticated ? 'authenticated-user' : 'anonymous'),
           walletAddress: address,
           sessionId: Date.now().toString()
         }),

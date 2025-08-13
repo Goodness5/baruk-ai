@@ -4,7 +4,7 @@ import { injected } from '@wagmi/connectors';
 
 // Define Sei Network testnet
 const seiTestnet = {
-  id: 713715,
+  id: 1328, // Correct Sei testnet EVM chain ID
   name: 'Sei Network Testnet',
   network: 'sei-testnet',
   nativeCurrency: {

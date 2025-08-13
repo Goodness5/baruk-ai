@@ -56,10 +56,39 @@ async function fetchCoinGeckoPrices(addresses: string[]): Promise<Record<string,
 }
 
 export async function POST(req: NextRequest) {
-  const { addresses } = await req.json();
+  const { addresses, chainId } = await req.json();
   if (!Array.isArray(addresses)) {
     return NextResponse.json({ error: 'Invalid addresses' }, { status: 400 });
   }
+  
+  // Check if we're on a testnet chain that price APIs don't support
+  if (chainId === 1328) {
+    console.log('🔄 Sei Network testnet detected - returning mock prices to avoid API errors');
+    // Return mock prices for testnet to avoid API errors
+    const mockPrices: Record<string, number> = {
+      '0x8923889697C9467548ABe8E815105993EBC785b6': 1.5, // TOKEN0
+      '0xF2C653e2a1F21ef409d0489c7c1d754d9f2905F7': 2.3, // TOKEN1
+      '0xD6383ef8A67E929274cE9ca05b694f782A5070D7': 0.8, // TOKEN2
+      'native': 0.487, // SEI native token
+    };
+    
+    // Return mock prices for all addresses
+    const result: Record<string, number> = {};
+    addresses.forEach(address => {
+      const lowerAddress = address.toLowerCase();
+      if (address === 'native') {
+        result[lowerAddress] = mockPrices.native;
+      } else if (mockPrices[address]) {
+        result[lowerAddress] = mockPrices[address];
+      } else {
+        // Default mock price for unknown tokens on testnet
+        result[lowerAddress] = 1.0;
+      }
+    });
+    
+    return NextResponse.json(result);
+  }
+  
   // Try syve first
   const syvePrices = await fetchSyvePrices(addresses);
   // Fallback to CoinGecko for missing
