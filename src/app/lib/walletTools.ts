@@ -1,6 +1,31 @@
 import { createWalletClient, http, createPublicClient, Hex } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { seiTestnet } from '../../chains/seiTestnet';
+
+// Define Sei Network testnet chain configuration
+const seiTestnet = {
+  id: 1328,
+  name: 'Sei Network Testnet',
+  network: 'sei-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'SEI',
+    symbol: 'SEI'
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://evm-rpc-testnet.sei-apis.com']
+    },
+    public: {
+      http: ['https://evm-rpc-testnet.sei-apis.com']
+    }
+  },
+  blockExplorers: {
+    default: {
+      name: 'Sei Testnet Explorer',
+      url: 'https://testnet.sei.io/explorer'
+    }
+  }
+} as const;
 
 export interface WalletResponse {
   address: string;

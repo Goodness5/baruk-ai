@@ -18,13 +18,13 @@ export const contractAddresses = {
 } as const;
 
 export const contractABIs = {
-  ammFactory: BarukAMMFactoryABI,
-  amm: BarukAMMABI,
-  lending: BarukLendingABI,
-  limitOrder: BarukLimitOrderABI,
-  router: BarukRouterABI,
-  yieldFarm: BarukYieldFarmABI,
-  erc20: ERC20ABI,
+  ammFactory: BarukAMMFactoryABI.abi,
+  amm: BarukAMMABI.abi,
+  lending: BarukLendingABI.abi,
+  limitOrder: BarukLimitOrderABI.abi,
+  router: BarukRouterABI.abi,
+  yieldFarm: BarukYieldFarmABI.abi,
+  erc20: ERC20ABI.abi,
 } as const;
 
 export type ContractNames = keyof typeof contractAddresses;

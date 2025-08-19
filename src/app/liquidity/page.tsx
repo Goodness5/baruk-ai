@@ -17,10 +17,10 @@ import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
-import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
+import { usePrivyBarukContract } from '../lib/usePrivyBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits, formatUnits } from 'viem';
-import { useAccount } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { waitForTransactionReceipt } from '@wagmi/core';
 import { config } from '@/wagmi';
 import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
@@ -28,14 +28,27 @@ import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function LiquidityPage() {
-  const { address, isConnected: walletConnected } = useAccount();
+  const { user, authenticated } = usePrivy();
   const balances = useAppStore(s => s.balances);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('amm');
+  const { callContract: privyCallContract, callTokenContract: privyCallTokenContract } = usePrivyBarukContract('amm');
+  
+  // Get user's wallet address from Privy
+  let address: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      address = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      address = (user.wallet.address as { address?: string }).address || null;
+    }
+  }
   
   // Pool and earning data
   const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
-  const { liquidityBalance, lpRewards } = useUserAMMData(address);
+  const { liquidityBalance, lpRewards } = useUserAMMData(address || undefined);
 
   const [activeTab, setActiveTab] = useState<'add' | 'remove' | 'positions'>('add');
   const [tokenA, setTokenA] = useState('TOKEN0');
@@ -133,7 +146,7 @@ export default function LiquidityPage() {
   const calculateRemoveAmount = () => {
     if (!liquidityBalance) return '0';
     try {
-      const balance = Number(formatUnits(liquidityBalance, 18));
+      const balance = Number(formatUnits(liquidityBalance as bigint, 18));
       return ((balance * removePercentage) / 100).toFixed(6);
     } catch {
       return '0';
@@ -141,8 +154,8 @@ export default function LiquidityPage() {
   };
 
   const handleAddLiquidity = async () => {
-    if (!address || !walletConnected) {
-      toast.error('Please connect your digital wallet first! 🔗');
+    if (!address || !authenticated) {
+      toast.error('Please sign in with Privy first! 🔗');
       return;
     }
 
@@ -175,27 +188,27 @@ export default function LiquidityPage() {
       // Approve tokens
       toast.loading('Setting up your liquidity provision... ⚡', { id: 'liquidity' });
       
-      const approvalTxA = await wagmiCallTokenContract(
+      const approvalTxA = await privyCallTokenContract(
         tokenAData.address,
         'approve',
         [contractAddresses.amm as `0x${string}`, amountAInWei]
       );
-      await waitForTransactionReceipt(config, { hash: approvalTxA.hash });
+      await waitForTransactionReceipt(config, { hash: approvalTxA.hash as unknown as `0x${string}` });
 
-      const approvalTxB = await wagmiCallTokenContract(
+      const approvalTxB = await privyCallTokenContract(
         tokenBData.address,
         'approve',
         [contractAddresses.amm as `0x${string}`, amountBInWei]
       );
-      await waitForTransactionReceipt(config, { hash: approvalTxB.hash });
+      await waitForTransactionReceipt(config, { hash: approvalTxB.hash as unknown as `0x${string}` });
 
       // Add liquidity
       toast.loading('Creating your liquidity position... ✨', { id: 'liquidity' });
-      const addLiquidityTx = await wagmiCallContract(
+      const addLiquidityTx = await privyCallContract(
         'addLiquidity',
         [amountAInWei, amountBInWei, address as `0x${string}`]
       );
-      await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash });
+      await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash as unknown as `0x${string}` });
 
       toast.success('🎉 Liquidity added successfully! You\'re now earning fees!', { id: 'liquidity' });
       
@@ -212,8 +225,8 @@ export default function LiquidityPage() {
   };
 
   const handleRemoveLiquidity = async () => {
-    if (!address || !walletConnected) {
-      toast.error('Please connect your digital wallet first! 🔗');
+    if (!address || !authenticated) {
+      toast.error('Please sign in with Privy first! 🔗');
       return;
     }
 
@@ -228,11 +241,11 @@ export default function LiquidityPage() {
       toast.loading('Removing your liquidity... 🔥', { id: 'remove' });
       
       const liquidityInWei = parseUnits(calculatedAmount, 18);
-      const removeLiquidityTx = await wagmiCallContract(
+      const removeLiquidityTx = await privyCallContract(
         'removeLiquidity',
         [liquidityInWei]
       );
-      await waitForTransactionReceipt(config, { hash: removeLiquidityTx.hash });
+      await waitForTransactionReceipt(config, { hash: removeLiquidityTx.hash as unknown as `0x${string}` });
 
       toast.success('✅ Liquidity removed successfully!', { id: 'remove' });
       setRemovePercentage(25);
@@ -445,17 +458,17 @@ export default function LiquidityPage() {
 
                     <motion.button
                       onClick={handleAddLiquidity}
-                      disabled={!walletConnected || !amountA || !amountB || loading}
+                      disabled={!authenticated || !amountA || !amountB || loading}
                       className={`w-full py-4 rounded-xl text-lg font-bold transition-all
-                        ${!walletConnected || !amountA || !amountB || loading
+                        ${!authenticated || !amountA || !amountB || loading
                           ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                           : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-lg hover:shadow-xl'
                         }`}
                       whileHover={!loading ? { scale: 1.02 } : {}}
                       whileTap={!loading ? { scale: 0.98 } : {}}
                     >
-                      {!walletConnected
-                        ? '🔗 Connect Your Wallet'
+                      {!authenticated
+                        ? '🔗 Sign In with Privy'
                         : loading
                         ? '✨ Adding Liquidity...'
                         : '💧 Add Liquidity & Start Earning'}
@@ -486,7 +499,7 @@ export default function LiquidityPage() {
                       <div className="flex justify-between mb-3">
                         <span className="text-gray-300 font-medium">Amount to Remove</span>
                         <span className="text-gray-300">
-                          Your Balance: {formatEarningsValue(liquidityBalance)}
+                          Your Balance: {formatEarningsValue(liquidityBalance as bigint)}
                         </span>
                       </div>
                       
@@ -526,17 +539,17 @@ export default function LiquidityPage() {
 
                     <motion.button
                       onClick={handleRemoveLiquidity}
-                      disabled={!walletConnected || !liquidityBalance || loading}
+                      disabled={!authenticated || !liquidityBalance || loading}
                       className={`w-full py-4 rounded-xl text-lg font-bold transition-all
-                        ${!walletConnected || !liquidityBalance || loading
+                        ${!authenticated || !liquidityBalance || loading
                           ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                           : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg hover:shadow-xl'
                         }`}
                       whileHover={!loading ? { scale: 1.02 } : {}}
                       whileTap={!loading ? { scale: 0.98 } : {}}
                     >
-                      {!walletConnected
-                        ? '🔗 Connect Your Wallet'
+                      {!authenticated
+                        ? '🔗 Sign In with Privy'
                         : !liquidityBalance
                         ? '💧 No Liquidity to Remove'
                         : loading
@@ -737,7 +750,7 @@ export default function LiquidityPage() {
                 
                 <div className="space-y-3">
                   <div className="p-3 rounded-lg bg-white/10 text-center">
-                    <div className="text-lg font-bold text-green-400">{formatEarningsValue(lpRewards)}</div>
+                    <div className="text-lg font-bold text-green-400">{formatEarningsValue(lpRewards as bigint)}</div>
                     <p className="text-xs text-gray-400">Total Rewards</p>
                   </div>
                   

@@ -14,7 +14,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   SparklesIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  CpuChipIcon
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -24,6 +25,7 @@ export default function Sidebar() {
   const navigation = [
     { name: 'Exchange', href: '/swap', icon: ArrowsRightLeftIcon },
     { name: 'Trading Hub', href: '/trading', icon: ChartBarIcon },
+    { name: 'AI Trading', href: '/ai-trading', icon: CpuChipIcon },
     { name: 'Liquidity', href: '/liquidity', icon: BeakerIcon },
     { name: 'Pools', href: '/pools', icon: BanknotesIcon },
     { name: 'Lending', href: '/lending', icon: CurrencyDollarIcon },

@@ -1,35 +1,33 @@
 import { contractAddresses, contractABIs, ContractNames } from './contractConfig';
 import { useCallback } from 'react';
-import { useAccount, useWalletClient } from 'wagmi';
+import { useWallets } from '@privy-io/react-auth';
 import { getContract, type Abi } from 'viem';
 
 export function useWagmiBarukContract(contractName: ContractNames) {
-  const { address } = useAccount();
-  const { data: walletClient } = useWalletClient();
+  const { wallets } = useWallets();
+  
+  // Get the Privy embedded wallet
+  const embeddedWallet = wallets?.find(w => w.walletClientType === 'privy');
+  const address = embeddedWallet?.address;
+  
+  // For now, we'll need to use a different approach since Privy doesn't expose walletClient directly
+  // Let's return a mock implementation that will be replaced
+  const mockWalletClient = null;
 
   const callContract = useCallback(async (
     method: string,
     args: unknown[] = [],
     options: Record<string, unknown> = {}
   ) => {
-    console.log('callContract - walletClient:', !!walletClient, 'address:', address);
+    console.log('callContract - embeddedWallet:', !!embeddedWallet, 'address:', address);
     
-    if (!walletClient || !address) {
-      throw new Error('Wallet not connected');
+    if (!embeddedWallet || !address) {
+      throw new Error('Privy wallet not connected');
     }
 
-    const contractAddress = contractAddresses[contractName];
-    const abi = (contractABIs[contractName] as { abi: Abi }).abi;
-    
-    const contract = getContract({
-      address: contractAddress as `0x${string}`,
-      abi: abi,
-      client: walletClient
-    });
-
-    const hash = await contract.write[method](args, options);
-    return { hash };
-  }, [contractName, walletClient, address]);
+    // For now, throw an error since we need to implement Privy-specific contract calls
+    throw new Error('Privy contract calls not yet implemented - need to use embeddedWallet methods directly');
+  }, [contractName, embeddedWallet, address]);
 
   const callTokenContract = useCallback(async (
     tokenAddress: string,
@@ -37,23 +35,15 @@ export function useWagmiBarukContract(contractName: ContractNames) {
     args: unknown[] = [],
     options: Record<string, unknown> = {}
   ) => {
-    console.log('callTokenContract - walletClient:', !!walletClient, 'address:', address);
+    console.log('callTokenContract - embeddedWallet:', !!embeddedWallet, 'address:', address);
     
-    if (!walletClient || !address) {
-      throw new Error('Wallet not connected');
+    if (!embeddedWallet || !address) {
+      throw new Error('Privy wallet not connected');
     }
 
-    const abi = (contractABIs.erc20 as { abi: Abi }).abi;
-    
-    const contract = getContract({
-      address: tokenAddress as `0x${string}`,
-      abi: abi,
-      client: walletClient
-    });
-
-    const hash = await contract.write[method](args, options);
-    return { hash };
-  }, [walletClient, address]);
+    // For now, throw an error since we need to implement Privy-specific contract calls
+    throw new Error('Privy token contract calls not yet implemented - need to use embeddedWallet methods directly');
+  }, [embeddedWallet, address]);
 
   return { callContract, callTokenContract };
 } 

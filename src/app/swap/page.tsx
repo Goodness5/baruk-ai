@@ -1,18 +1,18 @@
 
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowsRightLeftIcon, SparklesIcon, CurrencyDollarIcon, FireIcon } from '@heroicons/react/24/outline';
 import TokenSelector from '../components/TokenSelector';
 import { useAppStore } from '../store/useAppStore';
 import toast from 'react-hot-toast';
 import { SEI_PROTOCOLS, getSeiProtocolById, SeiProtocol, getProtocolTokens } from '../lib/seiProtocols';
-import { useWagmiBarukContract } from '../lib/useWagmiBarukContract';
+import { usePrivyBarukContract } from '../lib/usePrivyBarukContract';
 import { contractAddresses } from '../lib/contractConfig';
 import { parseUnits } from 'viem';
-import { useAccount } from 'wagmi';
-import { waitForTransactionReceipt } from '@wagmi/core'
-import { config } from '@/wagmi';
+import { usePrivy } from '@privy-io/react-auth';
+
+
 import { useBarukAMM, useUserAMMData } from '../lib/hooks/useBarukAMM';
 import { formatUnits } from 'viem';
 import TrendingTokens from '../components/TrendingTokens';
@@ -20,14 +20,36 @@ import TrendingTokens from '../components/TrendingTokens';
 const DEFAULT_PROTOCOL_ID = 'baruk';
 
 export default function ExchangePage() {
-  const { address, isConnected: walletConnected } = useAccount();
+  const { authenticated, user } = usePrivy();
   const balances = useAppStore(s => s.balances);
   const tokenPrices = useAppStore(s => s.tokenPrices);
-  const { callContract: wagmiCallContract, callTokenContract: wagmiCallTokenContract } = useWagmiBarukContract('router');
+  const { callContract: privyCallContract, callTokenContract: privyCallTokenContract } = usePrivyBarukContract('router');
+  
+  // Add ref to prevent multiple executions
+  const isExecutingRef = useRef(false);
+  
+  // Get user's wallet address from Privy - handle both string and object cases
+  let address: string | null = null;
+  
+  if (user?.wallet?.address) {
+    // Handle case where address might be an object
+    if (typeof user.wallet.address === 'string') {
+      address = user.wallet.address;
+    } else if (typeof user.wallet.address === 'object' && user.wallet.address !== null) {
+      // If it's an object, try to extract the address string
+      address = (user.wallet.address as any).address || null;
+    }
+  }
+  
+  // Debug: Log user object to see structure
+  console.log('Privy user object:', user);
+  console.log('Wallet address:', address);
+  
+  // Network switching is now handled automatically in the Privy contract hooks
   
   // Pool and earning data
   const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
-  const { liquidityBalance, lpRewards } = useUserAMMData(address);
+  const { liquidityBalance, lpRewards } = useUserAMMData(address || undefined);
 
   const [fromAsset, setFromAsset] = useState('TOKEN0');
   const [toAsset, setToAsset] = useState('TOKEN1');
@@ -125,8 +147,22 @@ export default function ExchangePage() {
   };
 
   const handleExchange = async () => {
-    if (!address || !walletConnected) {
-      toast.error('Please connect your digital wallet first! 🔗');
+    console.log('🚀 handleExchange called', { 
+      isExecuting: isExecutingRef.current, 
+      authenticated, 
+      amount, 
+      fromAsset, 
+      toAsset 
+    });
+    
+    // Prevent multiple executions using ref
+    if (isExecutingRef.current) {
+      console.log('🛑 Exchange already in progress, ignoring duplicate call');
+      return;
+    }
+
+    if (!address || !authenticated) {
+      toast.error('Please sign in with Privy first! 🔗');
       return;
     }
 
@@ -140,6 +176,9 @@ export default function ExchangePage() {
       return;
     }
 
+    // Set ref guard and loading state immediately to prevent multiple calls
+    console.log('🔒 Setting execution guard and starting exchange');
+    isExecutingRef.current = true;
     setIsExchanging(true);
     setExchangeStep('processing');
     
@@ -157,22 +196,51 @@ export default function ExchangePage() {
 
       const amountInWei = parseUnits(amount, 18);
 
-      // Step 1: Allow the exchange to happen
-      toast.loading('Setting up your exchange... ⚡', { id: 'exchange' });
-      const approvalTx = await wagmiCallTokenContract(
-        fromAssetData.address,
-        'approve',
-        [contractAddresses.router, amountInWei]
-      );
-      await waitForTransactionReceipt(config, { hash: approvalTx.hash });
+      // Step 1: Always request approval first (simpler and more reliable)
+      toast.loading('Setting up token permissions... 🔐', { id: 'exchange' });
+      console.log('🔄 Requesting approval for token:', fromAssetData.symbol);
+      
+      try {
+        const approvalTx = await privyCallTokenContract(
+          fromAssetData.address,
+          'approve',
+          [contractAddresses.router, amountInWei]
+        );
+        
+        console.log('✅ Approval transaction completed:', approvalTx.hash);
+        toast.success('Token permissions set! 🎉', { id: 'exchange' });
+        
+        // Wait a moment for the approval to be processed
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
+        console.error('Approval failed:', error);
+        throw new Error('Failed to set token permissions. Please try again.');
+      }
 
-      // Step 2: Do the actual exchange
+      // Step 2: Execute the swap
       toast.loading('Making the magic happen... ✨', { id: 'exchange' });
-      const swapTx = await wagmiCallContract(
+      
+      // Check if pool exists before attempting swap
+      try {
+        const poolAddress = await privyCallContract('getPair', [fromAssetData.address, toAssetData.address]);
+        console.log('Pool address:', poolAddress);
+        
+        if (!poolAddress || (poolAddress as any)?.hash === '0x0000000000000000000000000000000000000000') {
+          throw new Error('No liquidity pool exists for this token pair. You need to add liquidity first.');
+        }
+      } catch (error) {
+        console.error('Pool check failed:', error);
+        throw new Error('No liquidity pool exists for this token pair. You need to add liquidity first.');
+      }
+      
+      // Attempt the swap
+      const swapTx = await privyCallContract(
         'swap',
         [fromAssetData.address, toAssetData.address, amountInWei, 0, Math.floor(Date.now() / 1000) + 1200, address]
       );
-      await waitForTransactionReceipt(config, { hash: swapTx.hash });
+      
+      console.log('🎉 Swap transaction completed:', swapTx.hash);
 
       // Success celebration
       setExchangeStep('success');
@@ -190,9 +258,22 @@ export default function ExchangePage() {
     } catch (error) {
       console.error('Exchange error:', error);
       const errorMessage = (error as any)?.message || 'Something went wrong';
-      toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+      
+      // Check if it's a pool-related error
+      if (errorMessage.includes('No liquidity pool exists')) {
+        toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+        toast.error('💡 Tip: You need to add liquidity to this token pair first. Go to the Liquidity page to create a pool.', { 
+          id: 'liquidity-tip',
+          duration: 8000 
+        });
+      } else {
+        toast.error(`Exchange failed: ${errorMessage}`, { id: 'exchange' });
+      }
+      
       setExchangeStep('ready');
     } finally {
+      // Reset both the ref guard and the state
+      isExecutingRef.current = false;
       setIsExchanging(false);
     }
   };
@@ -269,8 +350,8 @@ export default function ExchangePage() {
   const calculateMyShare = () => {
     if (!liquidityBalance || !totalLiquidity) return '0.00';
     try {
-      const myBalance = Number(formatUnits(liquidityBalance, 18));
-      const total = Number(formatUnits(totalLiquidity, 18));
+      const myBalance = Number(formatUnits(liquidityBalance as bigint, 18));
+      const total = Number(formatUnits(totalLiquidity as bigint, 18));
       if (total === 0) return '0.00';
       return ((myBalance / total) * 100).toFixed(4);
     } catch {
@@ -302,6 +383,8 @@ export default function ExchangePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       <div className="max-w-6xl mx-auto p-4 lg:p-6">
         {/* Welcome Section for New Users - Very Compact */}
@@ -437,22 +520,22 @@ export default function ExchangePage() {
             {/* Main Action Button - Compact */}
             <motion.button
               onClick={handleExchange}
-              disabled={!walletConnected || !amount || isExchanging || exchangeStep === 'processing'}
+              disabled={!authenticated || !amount || isExecutingRef.current}
               className={`w-full mt-4 py-3 rounded-xl text-base font-bold transition-all relative overflow-hidden
-                ${!walletConnected || !amount || isExchanging
+                ${!authenticated || !amount || isExecutingRef.current
                   ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-lg hover:shadow-xl'
                 }`}
-              whileHover={!isExchanging ? { scale: 1.02 } : {}}
-              whileTap={!isExchanging ? { scale: 0.98 } : {}}
+              whileHover={!isExecutingRef.current ? { scale: 1.02 } : {}}
+              whileTap={!isExecutingRef.current ? { scale: 0.98 } : {}}
             >
-              {!walletConnected
-                ? '🔗 Connect Your Wallet First'
+              {!authenticated
+                ? '🔗 Sign In with Privy First'
                 : exchangeStep === 'processing'
                 ? '✨ Creating Magic...'
                 : exchangeStep === 'success'
                 ? '🎉 Exchange Successful!'
-                : isExchanging
+                : isExecutingRef.current
                 ? '⚡ Exchanging...'
                 : '🪄 Make the Exchange!'}
                 
@@ -464,6 +547,24 @@ export default function ExchangePage() {
                 />
               )}
             </motion.button>
+            
+            {/* User Education - Why Approval is Needed */}
+            {authenticated && amount && (
+              <div className="mt-3 p-3 rounded-lg bg-blue-900/30 border border-blue-400/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-blue-400">ℹ️</div>
+                  <h4 className="text-sm font-semibold text-blue-300">Two-Step Process</h4>
+                </div>
+                <p className="text-xs text-blue-200/80">
+                  You will see <strong>two Privy modals</strong>: First to approve spending {fromAsset}, then to execute the swap. 
+                  This is standard DeFi security - each transaction needs separate confirmation.
+                </p>
+                <div className="mt-2 text-xs text-blue-300/70">
+                  <div>🔐 <strong>Step 1:</strong> Approve router to spend your {fromAsset}</div>
+                  <div>🔄 <strong>Step 2:</strong> Execute the actual swap</div>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Sidebar - Optimized for Mobile */}
@@ -489,7 +590,7 @@ export default function ExchangePage() {
                   
                   <div className="grid grid-cols-2 gap-1">
                     <div className="p-1 rounded-lg bg-white/5 text-center">
-                      <div className="text-xs font-bold text-yellow-400">{formatEarningsValue(lpRewards)}</div>
+                      <div className="text-xs font-bold text-yellow-400">{formatEarningsValue(lpRewards as bigint)}</div>
                       <p className="text-xs text-gray-400">Rewards</p>
                     </div>
                     <div className="p-1 rounded-lg bg-white/5 text-center">

@@ -4,7 +4,7 @@ import { useReadContract, useWriteContract } from 'wagmi';
 
 export function useBarukAMM() {
   const ammAddress = contractAddresses.amm as `0x${string}`;
-  const ammAbi = contractABIs.amm.abi;
+  const ammAbi = contractABIs.amm;
 
   // Read functions
   const { data: reserves, isLoading: isReservesLoading } = useReadContract({
@@ -192,7 +192,7 @@ export function useBarukAMM() {
 // Hook for user-specific AMM data
 export function useUserAMMData(userAddress?: string) {
   const ammAddress = contractAddresses.amm as `0x${string}`;
-  const ammAbi = contractABIs.amm.abi;
+  const ammAbi = contractABIs.amm;
 
   const { data: liquidityBalance, isLoading: isLiquidityBalanceLoading } = useReadContract({
     address: ammAddress,
