@@ -12,6 +12,9 @@
     "test": "jest"
   },
   "dependencies": {
+    "@biconomy/account": "^4.5.7",
+    "@biconomy/bundler": "^3.1.4",
+    "@biconomy/paymaster": "^3.1.4",
     "@cosmjs/amino": "0.33.1",
     "@cosmjs/proto-signing": "0.33.1",
     "@cosmjs/stargate": "0.33.1",

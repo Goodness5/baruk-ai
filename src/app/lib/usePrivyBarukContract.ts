@@ -42,7 +42,7 @@ export function usePrivyBarukContract(contractName: ContractNames) {
       }
       
       const contractAddress = contractAddresses[contractName];
-      const abi = (contractABIs[contractName] as { abi: Abi }).abi;
+      const abi = contractABIs[contractName] as Abi;
       
       // Encode the function call
       const data = encodeFunctionData({
@@ -115,7 +115,7 @@ export function usePrivyBarukContract(contractName: ContractNames) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      const abi = (contractABIs.erc20 as { abi: Abi }).abi;
+      const abi = contractABIs.erc20 as Abi;
       
       // Encode the function call
       const data = encodeFunctionData({

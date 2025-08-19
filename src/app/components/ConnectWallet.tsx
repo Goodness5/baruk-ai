@@ -1,12 +1,11 @@
 "use client";
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { useState, useEffect } from 'react';
-import { seiTestnet } from '../../chains/seiTestnet';
 import { config } from '../../wagmi';
 
 export default function ConnectWallet() {
   const { address, isConnected, chainId } = useAccount();
-  const { connect, connectors, pendingConnector, error } = useConnect();
+  const { connect, connectors, error } = useConnect();
   const { disconnect } = useDisconnect();
   const [isOpen, setIsOpen] = useState(false);
   const [availableConnectors, setAvailableConnectors] = useState<typeof connectors>([]);
@@ -14,7 +13,9 @@ export default function ConnectWallet() {
   const [hasAttemptedReconnect, setHasAttemptedReconnect] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const isOnSeiTestnet = chainId === seiTestnet.id;
+  // Sei testnet chain ID
+  const seiTestnetId = 1328;
+  const isOnSeiTestnet = chainId === seiTestnetId;
 
   useEffect(() => {
     setIsMounted(true);

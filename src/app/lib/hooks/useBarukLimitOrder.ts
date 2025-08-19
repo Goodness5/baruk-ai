@@ -106,7 +106,7 @@ export function useBarukLimitOrder(userAddress?: Address): UseBarukLimitOrderRet
     refetch: refreshUserOrders
   } = useReadContract({
     address: contractAddresses.limitOrder,
-    abi: contractABIs.limitOrder.abi,
+    abi: contractABIs.limitOrder,
     functionName: 'getUserOrders',
     args: userAddress ? [userAddress] : undefined,
     query: {
@@ -125,7 +125,7 @@ export function useBarukLimitOrder(userAddress?: Address): UseBarukLimitOrderRet
     error: orderCountError
   } = useReadContract({
     address: contractAddresses.limitOrder,
-    abi: contractABIs.limitOrder.abi,
+    abi: contractABIs.limitOrder,
     functionName: 'orderCount',
   }) as {
     data: bigint | undefined;
@@ -179,7 +179,7 @@ export function useBarukLimitOrder(userAddress?: Address): UseBarukLimitOrderRet
       
       return await placeOrderAsync({
         address: contractAddresses.limitOrder,
-        abi: contractABIs.limitOrder.abi,
+        abi: contractABIs.limitOrder,
         functionName: 'placeOrder',
         args: [tokenIn, tokenOut, parsedAmountIn, targetAmountOut, orderDeadline],
       });
@@ -213,7 +213,7 @@ export function useBarukLimitOrder(userAddress?: Address): UseBarukLimitOrderRet
       
       return await executeOrderAsync({
         address: contractAddresses.limitOrder,
-        abi: contractABIs.limitOrder.abi,
+        abi: contractABIs.limitOrder,
         functionName: 'executeOrder',
         args: [BigInt(orderId), minAmountOut],
       });
@@ -233,7 +233,7 @@ export function useBarukLimitOrder(userAddress?: Address): UseBarukLimitOrderRet
     try {
       return await cancelOrderAsync({
         address: contractAddresses.limitOrder,
-        abi: contractABIs.limitOrder.abi,
+        abi: contractABIs.limitOrder,
         functionName: 'cancelOrder',
         args: [BigInt(orderId)],
       });

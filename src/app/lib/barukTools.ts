@@ -12,10 +12,15 @@ import YIELD_FARM_ABI_RAW from '../../abi/BarukYieldFarm.json';
 const ROUTER_ABI = ROUTER_ABI_RAW.abi as InterfaceAbi;
 const AMM_ABI = AMM_ABI_RAW.abi as InterfaceAbi;
 const YIELD_FARM_ABI = YIELD_FARM_ABI_RAW.abi as InterfaceAbi;
-import LENDING_ABI from '../../abi/BarukLending.json';
-import LIMIT_ORDER_ABI from '../../abi/BarukLimitOrder.json';
+import LENDING_ABI_RAW from '../../abi/BarukLending.json';
+import LIMIT_ORDER_ABI_RAW from '../../abi/BarukLimitOrder.json';
+
+const LENDING_ABI = LENDING_ABI_RAW.abi as InterfaceAbi;
+const LIMIT_ORDER_ABI = LIMIT_ORDER_ABI_RAW.abi as InterfaceAbi;
 import FACTORY_AMM from '../../abi/BarukAMMFactory.json';
-import ERC20_ABI from '../../abi/ERC20.json';
+import ERC20_ABI_RAW from '../../abi/ERC20.json';
+
+const ERC20_ABI = ERC20_ABI_RAW.abi as InterfaceAbi;
 
 const SEI_RPC_URL = process.env.SEI_RPC_URL || 'https://evm-rpc.sei-apis.com';
 const provider = new ethers.JsonRpcProvider(SEI_RPC_URL);
@@ -119,12 +124,12 @@ export async function swapTokens(params: {
     // Get token contracts with signer
     const tokenInContract = new ethers.Contract(
       params.tokenIn,
-      ERC20_ABI.abi || ERC20_ABI,
+      ERC20_ABI,
       params.signer
     );
     const router = new ethers.Contract(
       BARUK_CONTRACTS.Router,
-      ROUTER_ABI.abi || ROUTER_ABI,
+      ROUTER_ABI,
       params.signer
     );
 
@@ -168,7 +173,7 @@ export async function getSwapQuote(tokenIn: string, tokenOut: string, amountIn: 
       throw new Error('getSwapQuote: tokenIn, tokenOut, and amountIn are required');
     }
     // Use correct ABI array
-    const router = getContract(BARUK_CONTRACTS.Router, ROUTER_ABI.abi);
+    const router = getContract(BARUK_CONTRACTS.Router, ROUTER_ABI);
     const path = [tokenIn, tokenOut];
     const amounts = await router.getAmountsOut(amountIn, path);
     return amounts.map((amt: any) => amt.toString());
@@ -425,7 +430,7 @@ export async function findBestPrice(tokenIn: string, tokenOut: string, amountIn:
     for (const dex of dexes) {
       try {
         // Use correct ABI array
-        const router = getContract(dex.router, ROUTER_ABI.abi);
+        const router = getContract(dex.router, ROUTER_ABI);
         const path = [tokenIn, tokenOut];
         const amounts = await router.getAmountsOut(amountIn, path);
         const outputAmount = amounts[amounts.length - 1].toString();

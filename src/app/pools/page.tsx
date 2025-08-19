@@ -297,7 +297,7 @@ export default function PoolsPage() {
           <PoolCard 
             key={poolConfig.id} 
             poolConfig={poolConfig} 
-            userAddress={address} 
+            userAddress={address as `0x${string}` || undefined} 
           />
         ))}
       </div>

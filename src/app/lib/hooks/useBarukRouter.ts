@@ -231,7 +231,7 @@ export function useBarukRouter(): UseBarukRouterReturn {
       
       return await swapExactTokensForTokensAsync({
         address: contractAddresses.router,
-        abi: contractABIs.router.abi,
+        abi: contractABIs.router,
         functionName: 'swapExactTokensForTokens',
         args: [
           parsedAmountIn,
@@ -275,7 +275,7 @@ export function useBarukRouter(): UseBarukRouterReturn {
       
       return await swapTokensForExactTokensAsync({
         address: contractAddresses.router,
-        abi: contractABIs.router.abi,
+        abi: contractABIs.router,
         functionName: 'swapTokensForExactTokens',
         args: [
           parsedAmountOut,
@@ -326,7 +326,7 @@ export function useBarukRouter(): UseBarukRouterReturn {
       
       return await addLiquidityAsync({
         address: contractAddresses.router,
-        abi: contractABIs.router.abi,
+        abi: contractABIs.router,
         functionName: 'addLiquidity',
         args: [
           tokenA,
@@ -382,7 +382,7 @@ export function useBarukRouter(): UseBarukRouterReturn {
       
       return await removeLiquidityAsync({
         address: contractAddresses.router,
-        abi: contractABIs.router.abi,
+        abi: contractABIs.router,
         functionName: 'removeLiquidity',
         args: [
           tokenA,

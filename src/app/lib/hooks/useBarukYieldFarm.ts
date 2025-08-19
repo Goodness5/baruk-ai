@@ -136,7 +136,7 @@ export function useBarukYieldFarm(
     refetch: refetchPendingReward
   } = useReadContract({
     address: contractAddresses.yieldFarm,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'pendingReward',
     args: userAddress && poolId !== undefined ? [BigInt(poolId), userAddress] : undefined,
     query: {
@@ -156,7 +156,7 @@ export function useBarukYieldFarm(
     refetch: refetchPoolInfo
   } = useReadContract({
     address: contractAddresses.yieldFarm,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'poolInfo',
     args: poolId !== undefined ? [BigInt(poolId)] : undefined,
     query: {
@@ -176,7 +176,7 @@ export function useBarukYieldFarm(
     refetch: refetchUserInfo
   } = useReadContract({
     address: contractAddresses.yieldFarm,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'userInfo',
     args: userAddress && poolId !== undefined ? [BigInt(poolId), userAddress] : undefined,
     query: {
@@ -195,7 +195,7 @@ export function useBarukYieldFarm(
     error: rewardPerSecondError
   } = useReadContract({
     address: contractAddresses.yieldFarm,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'rewardPerSecond',
   }) as {
     data: bigint | undefined;
@@ -209,7 +209,7 @@ export function useBarukYieldFarm(
     error: totalAllocPointError
   } = useReadContract({
     address: contractAddresses.yieldFarm,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'totalAllocPoint',
   }) as {
     data: bigint | undefined;
@@ -276,7 +276,7 @@ export function useBarukYieldFarm(
       
       const hash = await stakeAsync({
         address: contractAddresses.yieldFarm,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'stake',
         args: [BigInt(targetPoolId), parsedAmount],
       });
@@ -316,7 +316,7 @@ export function useBarukYieldFarm(
       
       const hash = await unstakeAsync({
         address: contractAddresses.yieldFarm,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'unstake',
         args: [BigInt(targetPoolId), parsedAmount],
       });
@@ -350,7 +350,7 @@ export function useBarukYieldFarm(
     try {
       const hash = await claimRewardAsync({
         address: contractAddresses.yieldFarm,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'claimReward',
         args: [BigInt(targetPoolId)],
       });
@@ -383,7 +383,7 @@ export function useBarukYieldFarm(
     try {
       const hash = await emergencyWithdrawAsync({
         address: contractAddresses.yieldFarm,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'emergencyWithdraw',
         args: [BigInt(targetPoolId)],
       });

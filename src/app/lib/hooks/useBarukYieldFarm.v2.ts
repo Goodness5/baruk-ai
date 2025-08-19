@@ -116,7 +116,7 @@ export function useBarukYieldFarm(
     error: pendingRewardError
   } = useReadContract({
     address: contractAddresses.yieldFarm as Address,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'pendingReward',
     args: userAddress && poolId !== undefined ? [BigInt(poolId), userAddress] : undefined,
     query: {
@@ -134,7 +134,7 @@ export function useBarukYieldFarm(
     error: poolInfoError
   } = useReadContract({
     address: contractAddresses.yieldFarm as Address,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'poolInfo',
     args: poolId !== undefined ? [BigInt(poolId)] : undefined,
     query: {
@@ -152,7 +152,7 @@ export function useBarukYieldFarm(
     error: userInfoError
   } = useReadContract({
     address: contractAddresses.yieldFarm as Address,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'userInfo',
     args: userAddress && poolId !== undefined ? [BigInt(poolId), userAddress] : undefined,
     query: {
@@ -170,7 +170,7 @@ export function useBarukYieldFarm(
     error: rewardPerSecondError
   } = useReadContract({
     address: contractAddresses.yieldFarm as Address,
-    abi: contractABIs.yieldFarm.abi,
+    abi: contractABIs.yieldFarm,
     functionName: 'rewardPerSecond'
   }) as {
     data: bigint | undefined;
@@ -196,7 +196,7 @@ export function useBarukYieldFarm(
       
       return await stakeAsync({
         address: contractAddresses.yieldFarm as Address,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'stake',
         args: [BigInt(targetPoolId), parsedAmount],
       });
@@ -223,7 +223,7 @@ export function useBarukYieldFarm(
       
       return await unstakeAsync({
         address: contractAddresses.yieldFarm as Address,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'unstake',
         args: [BigInt(targetPoolId), parsedAmount],
       });
@@ -242,7 +242,7 @@ export function useBarukYieldFarm(
     try {
       return await claimRewardAsync({
         address: contractAddresses.yieldFarm as Address,
-        abi: contractABIs.yieldFarm.abi,
+        abi: contractABIs.yieldFarm,
         functionName: 'claimReward',
         args: [BigInt(targetPoolId)],
       });

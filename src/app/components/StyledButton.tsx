@@ -18,7 +18,7 @@ export function StyledButton({
   ...props 
 }: StyledButtonProps) {
   // Filter out isActive and other problematic props
-  const { isActive: _, ...buttonProps } = props;
+  const { isActive: _, ...buttonProps } = { isActive, ...props };
   
   const baseClasses = 'rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2';
   

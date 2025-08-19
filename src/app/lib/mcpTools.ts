@@ -12,13 +12,13 @@ import type {
   FlowAnalysis 
 } from './types';
 
-// Import actual ABIs from out/ directory
-import BarukLendingABI from '../../../out/BarukLending.sol/BarukLending.json'; // BarukLending
-import BarukLimitOrderABI from '../../../out/BarukLimitOrder.sol/BarukLimitOrder.json'; // BarukLimitOrder
-import BarukYieldFarmABI from '../../../out/BarukYieldFarm.sol/BarukYieldFarm.json'; // BarukYieldFarm
-import BarukRouterABI from '../../../out/Router.sol/BarukRouter.json'; // BarukRouter
-import BarukAMMFactoryABI from '../../../out/BarukAMMFactory.sol/BarukAMMFactory.json'; // BarukAMMFactory
-import BarukAMMABI from '../../../out/AMM.sol/BarukAMM.json'; // BarukAMM
+// Import actual ABIs from abi/ directory
+import BarukLendingABI from '../../abi/BarukLending.json'; // BarukLending
+import BarukLimitOrderABI from '../../abi/BarukLimitOrder.json'; // BarukLimitOrder
+import BarukYieldFarmABI from '../../abi/BarukYieldFarm.json'; // BarukYieldFarm
+import BarukRouterABI from '../../abi/BarukRouter.json'; // BarukRouter
+import BarukAMMFactoryABI from '../../abi/BarukAMMFactory.json'; // BarukAMMFactory
+import BarukAMMABI from '../../abi/BarukAMM.json'; // BarukAMM
 
 // Initialize provider for Sei network
 const SEI_RPC_URL = process.env.SEI_RPC_URL || 'https://evm-rpc-testnet.sei-apis.com';

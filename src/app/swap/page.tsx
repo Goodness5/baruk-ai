@@ -226,7 +226,7 @@ export default function ExchangePage() {
         const poolAddress = await privyCallContract('getPair', [fromAssetData.address, toAssetData.address]);
         console.log('Pool address:', poolAddress);
         
-        if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
+        if (!poolAddress || (poolAddress as any)?.hash === '0x0000000000000000000000000000000000000000') {
           throw new Error('No liquidity pool exists for this token pair. You need to add liquidity first.');
         }
       } catch (error) {
@@ -350,8 +350,8 @@ export default function ExchangePage() {
   const calculateMyShare = () => {
     if (!liquidityBalance || !totalLiquidity) return '0.00';
     try {
-      const myBalance = Number(formatUnits(liquidityBalance, 18));
-      const total = Number(formatUnits(totalLiquidity, 18));
+      const myBalance = Number(formatUnits(liquidityBalance as bigint, 18));
+      const total = Number(formatUnits(totalLiquidity as bigint, 18));
       if (total === 0) return '0.00';
       return ((myBalance / total) * 100).toFixed(4);
     } catch {
@@ -556,7 +556,7 @@ export default function ExchangePage() {
                   <h4 className="text-sm font-semibold text-blue-300">Two-Step Process</h4>
                 </div>
                 <p className="text-xs text-blue-200/80">
-                  You'll see <strong>two Privy modals</strong>: First to approve spending {fromAsset}, then to execute the swap. 
+                  You will see <strong>two Privy modals</strong>: First to approve spending {fromAsset}, then to execute the swap. 
                   This is standard DeFi security - each transaction needs separate confirmation.
                 </p>
                 <div className="mt-2 text-xs text-blue-300/70">
@@ -590,7 +590,7 @@ export default function ExchangePage() {
                   
                   <div className="grid grid-cols-2 gap-1">
                     <div className="p-1 rounded-lg bg-white/5 text-center">
-                      <div className="text-xs font-bold text-yellow-400">{formatEarningsValue(lpRewards)}</div>
+                      <div className="text-xs font-bold text-yellow-400">{formatEarningsValue(lpRewards as bigint)}</div>
                       <p className="text-xs text-gray-400">Rewards</p>
                     </div>
                     <div className="p-1 rounded-lg bg-white/5 text-center">

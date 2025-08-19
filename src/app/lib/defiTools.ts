@@ -1,6 +1,5 @@
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { seiTestnet } from '../../chains/seiTestnet';
 import * as barukTools from './barukTools';
 
 export interface WalletState {

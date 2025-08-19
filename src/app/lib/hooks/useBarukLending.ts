@@ -150,7 +150,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
     error: maxBorrowError
   } = useReadContract({
     address: contractAddresses.lending,
-    abi: contractABIs.lending.abi,
+    abi: contractABIs.lending,
     functionName: 'getMaxBorrow',
     args: userAddress ? [userAddress] : undefined,
     query: {
@@ -164,7 +164,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
     error: liquidationPriceError
   } = useReadContract({
     address: contractAddresses.lending,
-    abi: contractABIs.lending.abi,
+    abi: contractABIs.lending,
     functionName: 'getLiquidationPrice',
     args: userAddress ? [userAddress] : undefined,
     query: {
@@ -178,7 +178,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
     error: healthFactorError
   } = useReadContract({
     address: contractAddresses.lending,
-    abi: contractABIs.lending.abi,
+    abi: contractABIs.lending,
     functionName: 'getHealthFactor',
     args: userAddress ? [userAddress] : undefined,
     query: {
@@ -198,7 +198,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       const parsedAmount = parseUnits(amount, decimals);
       return await depositAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'deposit',
         args: [token, parsedAmount],
       });
@@ -219,7 +219,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       const parsedAmount = parseUnits(amount, decimals);
       return await borrowAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'borrow',
         args: [token, parsedAmount],
       });
@@ -242,7 +242,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       
       return await depositAndBorrowAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'depositAndBorrow',
         args: [collateralToken, parsedDepositAmount, borrowToken, parsedBorrowAmount],
       });
@@ -263,7 +263,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       const parsedAmount = parseUnits(amount, decimals);
       return await repayAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'repay',
         args: [token, parsedAmount],
       });
@@ -284,7 +284,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       const parsedAmount = parseUnits(amount, decimals);
       return await withdrawAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'withdraw',
         args: [token, parsedAmount],
       });
@@ -305,7 +305,7 @@ export function useBarukLending(userAddress?: Address): UseBarukLendingReturn {
       const parsedDebtToCover = parseUnits(debtToCover, decimals);
       return await liquidateAsync({
         address: contractAddresses.lending,
-        abi: contractABIs.lending.abi,
+        abi: contractABIs.lending,
         functionName: 'liquidate',
         args: [user, collateralToken, debtToken, parsedDebtToCover],
       });

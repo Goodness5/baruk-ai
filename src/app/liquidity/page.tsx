@@ -48,7 +48,7 @@ export default function LiquidityPage() {
   
   // Pool and earning data
   const { reserves, totalLiquidity, lpFeeBps } = useBarukAMM();
-  const { liquidityBalance, lpRewards } = useUserAMMData(address);
+  const { liquidityBalance, lpRewards } = useUserAMMData(address || undefined);
 
   const [activeTab, setActiveTab] = useState<'add' | 'remove' | 'positions'>('add');
   const [tokenA, setTokenA] = useState('TOKEN0');
@@ -146,7 +146,7 @@ export default function LiquidityPage() {
   const calculateRemoveAmount = () => {
     if (!liquidityBalance) return '0';
     try {
-      const balance = Number(formatUnits(liquidityBalance, 18));
+      const balance = Number(formatUnits(liquidityBalance as bigint, 18));
       return ((balance * removePercentage) / 100).toFixed(6);
     } catch {
       return '0';
@@ -193,14 +193,14 @@ export default function LiquidityPage() {
         'approve',
         [contractAddresses.amm as `0x${string}`, amountAInWei]
       );
-      await waitForTransactionReceipt(config, { hash: approvalTxA.hash });
+      await waitForTransactionReceipt(config, { hash: approvalTxA.hash as unknown as `0x${string}` });
 
       const approvalTxB = await privyCallTokenContract(
         tokenBData.address,
         'approve',
         [contractAddresses.amm as `0x${string}`, amountBInWei]
       );
-      await waitForTransactionReceipt(config, { hash: approvalTxB.hash });
+      await waitForTransactionReceipt(config, { hash: approvalTxB.hash as unknown as `0x${string}` });
 
       // Add liquidity
       toast.loading('Creating your liquidity position... ✨', { id: 'liquidity' });
@@ -208,7 +208,7 @@ export default function LiquidityPage() {
         'addLiquidity',
         [amountAInWei, amountBInWei, address as `0x${string}`]
       );
-      await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash });
+      await waitForTransactionReceipt(config, { hash: addLiquidityTx.hash as unknown as `0x${string}` });
 
       toast.success('🎉 Liquidity added successfully! You\'re now earning fees!', { id: 'liquidity' });
       
@@ -245,7 +245,7 @@ export default function LiquidityPage() {
         'removeLiquidity',
         [liquidityInWei]
       );
-      await waitForTransactionReceipt(config, { hash: removeLiquidityTx.hash });
+      await waitForTransactionReceipt(config, { hash: removeLiquidityTx.hash as unknown as `0x${string}` });
 
       toast.success('✅ Liquidity removed successfully!', { id: 'remove' });
       setRemovePercentage(25);
@@ -499,7 +499,7 @@ export default function LiquidityPage() {
                       <div className="flex justify-between mb-3">
                         <span className="text-gray-300 font-medium">Amount to Remove</span>
                         <span className="text-gray-300">
-                          Your Balance: {formatEarningsValue(liquidityBalance)}
+                          Your Balance: {formatEarningsValue(liquidityBalance as bigint)}
                         </span>
                       </div>
                       
@@ -750,7 +750,7 @@ export default function LiquidityPage() {
                 
                 <div className="space-y-3">
                   <div className="p-3 rounded-lg bg-white/10 text-center">
-                    <div className="text-lg font-bold text-green-400">{formatEarningsValue(lpRewards)}</div>
+                    <div className="text-lg font-bold text-green-400">{formatEarningsValue(lpRewards as bigint)}</div>
                     <p className="text-xs text-gray-400">Total Rewards</p>
                   </div>
                   
