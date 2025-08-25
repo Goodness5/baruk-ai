@@ -1,6 +1,6 @@
 "use client";
 
-import { timeStamp } from 'console';
+
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 
 export type AIMessage = {
@@ -69,6 +69,7 @@ const initialState: AIState = {
 
 type AIAction =
   | { type: 'SEND_MESSAGE'; message: AIMessage }
+  | { type: 'REMOVE_MESSAGE'; messageId: number }
   | { type: 'SET_INPUT'; input: string }
   | { type: 'TRIGGER_ACTION'; action: string; data?: unknown }
   | { type: 'CLEAR_ACTION' };
@@ -77,6 +78,8 @@ function aiReducer(state: AIState, action: AIAction): AIState {
   switch (action.type) {
     case 'SEND_MESSAGE':
       return { ...state, chat: [...state.chat, action.message], input: '' };
+    case 'REMOVE_MESSAGE':
+      return { ...state, chat: state.chat.filter(msg => msg.timestamp !== action.messageId) };
     case 'SET_INPUT':
       return { ...state, input: action.input };
     case 'TRIGGER_ACTION':

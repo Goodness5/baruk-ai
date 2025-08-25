@@ -54,6 +54,11 @@ export default function AIOrb() {
     if (!state.input.trim()) return;
     dispatch({ type: "SEND_MESSAGE", message: { role: "user", content: state.input, timestamp: Date.now() } });
     setLoading(true);
+    
+    // Add a loading message to show processing
+    const loadingMessageId = Date.now();
+    dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Processing your request... ⏳', timestamp: loadingMessageId } });
+    
     try {
       const res = await fetch('/api/baruk-chat', {
         method: 'POST',
@@ -66,13 +71,25 @@ export default function AIOrb() {
         }),
       });
       const data = await res.json();
-      // Always use data.text for the agent's answer
-      if (data.text) {
+      console.log('Frontend received API response:', data);
+      
+      // Remove the loading message and add the real response
+      dispatch({ type: "REMOVE_MESSAGE", messageId: loadingMessageId });
+      
+      // Check for success response first
+      if (data.success && data.message) {
+        dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: data.message, timestamp: Date.now() } });
+      } else if (data.text) {
+        // Fallback to data.text for backward compatibility
         dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: data.text, timestamp: Date.now() } });
       } else {
+        // Last resort fallback
         dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.', timestamp: Date.now() } });
       }
     } catch (e) {
+      console.error('Frontend error:', e);
+      // Remove the loading message and add error
+      dispatch({ type: "REMOVE_MESSAGE", messageId: loadingMessageId });
       dispatch({ type: "SEND_MESSAGE", message: { role: "ai", content: 'Sorry, Baruk could not answer right now.', timestamp: Date.now() } });
     }
     setLoading(false);
@@ -135,7 +152,9 @@ export default function AIOrb() {
                   <div key={i} className={`mb-2 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     {msg.role === 'ai' ? (
                       <div
-                        className="px-4 py-3 rounded-2xl text-base max-w-[90%] bg-gradient-to-br from-black/70 via-black/80 to-black/90 border border-neon-cyan shadow-lg text-white"
+                        className={`px-4 py-3 rounded-2xl text-base max-w-[90%] bg-gradient-to-br from-black/70 via-black/80 to-black/90 border border-neon-cyan shadow-lg text-white ${
+                          msg.content === 'Processing your request...' ? 'animate-pulse' : ''
+                        }`}
                         dangerouslySetInnerHTML={{ __html: stripAgentStyles(msg.content) }}
                       />
                     ) : (
